@@ -23,6 +23,7 @@ from multimodal_utils import (
     extract_frames_and_annotations_from_transcripts,
     extract_frames_and_generate_captions,
     extract_transcript_from_audio,
+    generate_annotations_from_transcript,
     generate_video_id,
     load_json_file,
     load_whisper_model,
@@ -44,7 +45,7 @@ class MultimodalRedis(Redis):
     def from_text_image_pairs_return_keys(
         cls: Type[Redis],
         texts: List[str],
-        images: List[str],
+        images: List[str] = None,
         embedding: Embeddings = BridgeTowerEmbedding,
         metadatas: Optional[List[dict]] = None,
         index_name: Optional[str] = None,
@@ -55,7 +56,8 @@ class MultimodalRedis(Redis):
         """
         Args:
             texts (List[str]): List of texts to add to the vectorstore.
-            images (List[str]): List of path-to-images to add to the vectorstore.
+            images (List[str]): Optional list of path-to-images to add to the vectorstore. If provided, the length of
+                the list of images must match the length of the list of text strings.
             embedding (Embeddings): Embeddings to use for the vectorstore.
             metadatas (Optional[List[dict]], optional): Optional list of metadata
                 dicts to add to the vectorstore. Defaults to None.
@@ -74,8 +76,8 @@ class MultimodalRedis(Redis):
             ValueError: If the number of texts does not equal the number of images.
             ValueError: If the number of metadatas does not match the number of texts.
         """
-        # the length of texts must be equal to the length of images
-        if len(texts) != len(images):
+        # If images are provided, the length of texts must be equal to the length of images
+        if images and len(texts) != len(images):
             raise ValueError(f"the len of captions {len(texts)} does not equal the len of images {len(images)}")
 
         redis_url = get_from_dict_or_env(kwargs, "redis_url", "REDIS_URL")
@@ -117,7 +119,10 @@ class MultimodalRedis(Redis):
             **kwargs,
         )
         # Add data to Redis
-        keys = instance.add_text_image_pairs(texts, images, metadatas, keys=keys)
+        print("Add data to redis - texts")
+        print(texts)
+        keys = instance.add_text_image_pairs(texts, images, metadatas, keys=keys) if images else \
+            instance.add_text(texts, metadatas, keys=keys)
         return instance, keys
 
     def add_text_image_pairs(
@@ -187,6 +192,71 @@ class MultimodalRedis(Redis):
         # Cleanup final batch
         pipeline.execute()
         return ids
+    
+    def add_text(
+        self,
+        texts: Iterable[str],
+        metadatas: Optional[List[dict]] = None,
+        embeddings: Optional[List[List[float]]] = None,
+        clean_metadata: bool = True,
+        **kwargs: Any,
+    ) -> List[str]:
+        """Add more embeddings of text to the vectorstore.
+
+        Args:
+            texts (Iterable[str]): Iterable of strings/text to add to the vectorstore.
+            metadatas (Optional[List[dict]], optional): Optional list of metadatas.
+                Defaults to None.
+            embeddings (Optional[List[List[float]]], optional): Optional pre-generated
+                embeddings. Defaults to None.
+            keys (List[str]) or ids (List[str]): Identifiers of entries.
+                Defaults to None.
+        Returns:
+            List[str]: List of ids added to the vectorstore
+        """
+        ids = []
+        # Get keys or ids from kwargs
+        # Other vectorstores use ids
+        keys_or_ids = kwargs.get("keys", kwargs.get("ids"))
+
+        # type check for metadata
+        if metadatas:
+            if isinstance(metadatas, list) and len(metadatas) != len(texts):  # type: ignore  # noqa: E501
+                raise ValueError("Number of metadatas must match number of texts")
+            if not (isinstance(metadatas, list) and isinstance(metadatas[0], dict)):
+                raise ValueError("Metadatas must be a list of dicts")
+
+        if not embeddings:
+            embeddings = self._embeddings.embed_documents(list(texts))
+        self._create_index_if_not_exist(dim=len(embeddings[0]))
+
+        # Write data to redis
+        pipeline = self.client.pipeline(transaction=False)
+        for i, text in enumerate(texts):
+            # Use provided values by default or fallback
+            key = keys_or_ids[i] if keys_or_ids else str(uuid.uuid4().hex)
+            if not key.startswith(self.key_prefix + ":"):
+                key = self.key_prefix + ":" + key
+            metadata = metadatas[i] if metadatas else {}
+            metadata = _prepare_metadata(metadata) if clean_metadata else metadata
+            pipeline.hset(
+                key,
+                mapping={
+                    self._schema.content_key: text,
+                    self._schema.content_vector_key: _array_to_buffer(embeddings[i], self._schema.vector_dtype),
+                    **metadata,
+                },
+            )
+            ids.append(key)
+
+            # TODO: Is this not needed if we aren't batching?
+            # Write batch
+            # if i % batch_size == 0:
+            #     pipeline.execute()
+
+        # Cleanup final batch
+        pipeline.execute()
+        return ids
 
 
 def prepare_data_and_metadata_from_annotation(
@@ -198,6 +268,7 @@ def prepare_data_and_metadata_from_annotation(
     for i, frame in enumerate(annotation):
         frame_index = frame["sub_video_id"]
         path_to_frame = os.path.join(path_to_frames, f"frame_{frame_index}.png")
+
         # augment this frame's transcript with a reasonable number of neighboring frames' transcripts helps semantic retrieval
         lb_ingesting = max(0, i - num_transcript_concat_for_ingesting)
         ub_ingesting = min(len(annotation), i + num_transcript_concat_for_ingesting + 1)
@@ -215,7 +286,10 @@ def prepare_data_and_metadata_from_annotation(
         source_video = frame["video_name"]
 
         text_list.append(caption_for_ingesting)
-        image_list.append(path_to_frame)
+
+        if b64_img_str:
+            image_list.append(path_to_frame)
+
         metadatas.append(
             {
                 "content": caption_for_ingesting,
@@ -240,8 +314,19 @@ def ingest_multimodal(videoname, data_folder, embeddings):
 
     annotation = load_json_file(annotation_file_path)
 
+    # If there's frame data along with the text, use neighboring parts of the transcript to increase context
+    has_frames = os.path.exists(path_to_frames)
+    num_transcript_concat_for_ingesting = 2 if has_frames else 0
+    num_transcript_concat_for_inference = 7 if has_frames else 0
+
     # prepare data to ingest
-    text_list, image_list, metadatas = prepare_data_and_metadata_from_annotation(annotation, path_to_frames, videoname)
+    text_list, image_list, metadatas = prepare_data_and_metadata_from_annotation(annotation, path_to_frames, videoname,
+        num_transcript_concat_for_ingesting, num_transcript_concat_for_inference)
+
+    print("text list")
+    print(text_list)
+    print("image list")
+    print(image_list)
 
     MultimodalRedis.from_text_image_pairs_return_keys(
         texts=[f"From {videoname}. " + text for text in text_list],
@@ -269,44 +354,53 @@ def drop_index(index_name, redis_url=REDIS_URL):
     name="opea_service@prepare_videodoc_redis", endpoint="/v1/generate_transcripts", host="0.0.0.0", port=6007
 )
 async def ingest_videos_generate_transcripts(files: List[UploadFile] = File(None)):
-    """Upload videos with speech, generate transcripts using whisper and ingest into redis."""
+    """Upload videos or audio files with speech, generate transcripts using whisper and ingest into redis."""
 
     if files:
-        video_files = []
-        uploaded_videos_saved_videos_map = {}
+        files_to_ingest = []
+        uploaded_files_map = {}
         for file in files:
-            if os.path.splitext(file.filename)[1] == ".mp4":
-                video_files.append(file)
+            if os.path.splitext(file.filename)[1] in [".mp4", ".wav"]:
+                files_to_ingest.append(file)
             else:
                 raise HTTPException(
                     status_code=400, detail=f"File {file.filename} is not an mp4 file. Please upload mp4 files only."
                 )
 
-        for video_file in video_files:
+        for file_to_ingest in files_to_ingest:
             st = time.time()
-            print(f"Processing video {video_file.filename}")
+            file_extension = os.path.splitext(file_to_ingest.filename)[1]
+            is_video = file_extension == ".mp4"
+            file_type_str = "video" if is_video else "audio file"
+            print(f"Processing {file_type_str} {file_to_ingest.filename}")
 
-            # Assign unique identifier to video
-            video_id = generate_video_id()
+            # Assign unique identifier to the file being ingested
+            file_id = generate_video_id()
 
             # Create video file name by appending identifier
-            video_name = os.path.splitext(video_file.filename)[0]
-            video_file_name = f"{video_name}_{video_id}.mp4"
-            video_dir_name = os.path.splitext(video_file_name)[0]
+            base_file_name = os.path.splitext(file_to_ingest.filename)[0]
+            file_name_with_id = f"{base_file_name}_{file_id}{file_extension}"
+            dir_name = os.path.splitext(file_name_with_id)[0]
 
-            # Save video file in upload_directory
-            with open(os.path.join(upload_folder, video_file_name), "wb") as f:
-                shutil.copyfileobj(video_file.file, f)
+            # Save file in upload_directory
+            with open(os.path.join(upload_folder, file_name_with_id), "wb") as f:
+                shutil.copyfileobj(file_to_ingest.file, f)
 
-            uploaded_videos_saved_videos_map[video_name] = video_file_name
+            # TODO: What is the key used for? Can we add _wav and _mp4 to avoid conflicts when there's a video and
+            # audio file with the same name?
+            uploaded_files_map[base_file_name] = file_name_with_id
 
-            # Extract temporary audio wav file from video mp4
-            audio_file = video_dir_name + ".wav"
-            print(f"Extracting {audio_file}")
-            convert_video_to_audio(
-                os.path.join(upload_folder, video_file_name), os.path.join(upload_folder, audio_file)
-            )
-            print(f"Done extracting {audio_file}")
+            if is_video:
+                # Extract temporary audio wav file from video mp4
+                audio_file = dir_name + ".wav"
+                print(f"Extracting {audio_file}")
+                convert_video_to_audio(
+                    os.path.join(upload_folder, file_name_with_id), os.path.join(upload_folder, audio_file)
+                )
+                print(f"Done extracting {audio_file}")
+            else:
+                # We already have an audio file
+                audio_file = file_name_with_id
 
             # Load whisper model
             print("Loading whisper model....")
@@ -316,43 +410,67 @@ async def ingest_videos_generate_transcripts(files: List[UploadFile] = File(None
             # Extract transcript from audio
             print("Extracting transcript from audio")
             transcripts = extract_transcript_from_audio(whisper_model, os.path.join(upload_folder, audio_file))
+            print(transcripts)
 
             # Save transcript as vtt file and delete audio file
-            vtt_file = video_dir_name + ".vtt"
+            vtt_file = dir_name + ".vtt"
             write_vtt(transcripts, os.path.join(upload_folder, vtt_file))
             delete_audio_file(os.path.join(upload_folder, audio_file))
             print("Done extracting transcript.")
 
-            # Store frames and caption annotations in a new directory
-            print("Extracting frames and generating annotation")
-            extract_frames_and_annotations_from_transcripts(
-                video_id,
-                os.path.join(upload_folder, video_file_name),
-                os.path.join(upload_folder, vtt_file),
-                os.path.join(upload_folder, video_dir_name),
-            )
+            if is_video:
+                # Store frames and caption annotations in a new directory
+                print("Extracting frames and generating annotation")
+                generate_annotations(
+                    file_id,
+                    os.path.join(upload_folder, file_name_with_id),
+                    os.path.join(upload_folder, vtt_file),
+                    os.path.join(upload_folder, dir_name),
+                )
+            else:
+                # Generate annotations based on the transcript
+                print("Generating annotations for the transcription")
+                generate_annotations_from_transcript(
+                    file_id,
+                    os.path.join(upload_folder, file_name_with_id),
+                    os.path.join(upload_folder, vtt_file),
+                    os.path.join(upload_folder, dir_name),
+                )
+   
+            # DEBUG
+            annotations_file = os.path.join(upload_folder, dir_name, "annotations.json")
+            print("annotations file: " + annotations_file)
+            with open(annotations_file, "r") as f:
+                import json
+                data = json.load(f)
+
+                for x in data:
+                    print("caption: " + x["caption"])
+                    print("frame_no: " + str(x["frame_no"]))
+                    print("sub_video_id: " + str(x["sub_video_id"]))
+
             print("Done extracting frames and generating annotation")
             # Delete temporary vtt file
             os.remove(os.path.join(upload_folder, vtt_file))
 
             # Ingest multimodal data into redis
             print("Ingesting data to redis vector store")
-            ingest_multimodal(video_name, os.path.join(upload_folder, video_dir_name), embeddings)
+            ingest_multimodal(base_file_name, os.path.join(upload_folder, dir_name), embeddings)
 
             # Delete temporary video directory containing frames and annotations
-            shutil.rmtree(os.path.join(upload_folder, video_dir_name))
+            shutil.rmtree(os.path.join(upload_folder, dir_name))
 
-            print(f"Processed video {video_file.filename}")
+            print(f"Processed video {file_to_ingest.filename}")
             end = time.time()
             print(str(end - st))
 
         return {
             "status": 200,
             "message": "Data preparation succeeded",
-            "video_id_maps": uploaded_videos_saved_videos_map,
+            "file_id_maps": uploaded_files_map,
         }
 
-    raise HTTPException(status_code=400, detail="Must provide at least one video (.mp4) file.")
+    raise HTTPException(status_code=400, detail="Must provide at least one video (.mp4) or audio (.wav) file.")
 
 
 @register_microservice(
