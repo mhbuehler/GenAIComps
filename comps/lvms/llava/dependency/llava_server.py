@@ -54,31 +54,39 @@ async def generate(request: Request) -> Response:  # FIXME batch_size=1 for now,
     img_b64_str = request_dict.pop("img_b64_str")
     max_new_tokens = request_dict.pop("max_new_tokens", 100)
 
-    # format the prompt
-    prompt = f"<image>\nUSER: {prompt}\nASSISTANT:"
+    print("in generate, img_b64_str: '" + str(img_b64_str) + "'")
 
-    # Decode and Resize the image
-    image = PIL.Image.open(BytesIO(base64.b64decode(img_b64_str)))
-    image = process_image(image)
+    if img_b64_str:
+        # format the prompt
+        prompt = f"<image>\nUSER: {prompt}\nASSISTANT:"
 
-    if args.device == "hpu":
-        generate_kwargs = {
-            "lazy_mode": True,
-            "hpu_graphs": True,
-            "max_new_tokens": max_new_tokens,
-            "ignore_eos": False,
-        }
+        # Decode and Resize the image
+        image = PIL.Image.open(BytesIO(base64.b64decode(img_b64_str)))
+        image = process_image(image)
+
+        if args.device == "hpu":
+            generate_kwargs = {
+                "lazy_mode": True,
+                "hpu_graphs": True,
+                "max_new_tokens": max_new_tokens,
+                "ignore_eos": False,
+            }
+        else:
+            generate_kwargs = {
+                "max_new_tokens": max_new_tokens,
+            }
+
+        start = time.time()
+        result = generator(image, prompt=prompt, batch_size=1, generate_kwargs=generate_kwargs)
+        end = time.time()
+        result = result[0]["generated_text"].split("ASSISTANT: ")[-1]
+        print(f"LLaVA result = {result}, time = {(end-start) * 1000 }ms")
+        image.close()
     else:
-        generate_kwargs = {
-            "max_new_tokens": max_new_tokens,
-        }
-
-    start = time.time()
-    result = generator(image, prompt=prompt, batch_size=1, generate_kwargs=generate_kwargs)
-    end = time.time()
-    result = result[0]["generated_text"].split("ASSISTANT: ")[-1]
-    print(f"LLaVA result = {result}, time = {(end-start) * 1000 }ms")
-    image.close()
+        # TODO: Call LLM?
+        print("Image was not found, skip the LVM and return the text")
+        result = prompt
+    
     ret = {"text": result}
     return JSONResponse(ret)
 

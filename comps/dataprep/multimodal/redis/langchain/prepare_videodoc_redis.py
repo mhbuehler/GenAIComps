@@ -119,8 +119,6 @@ class MultimodalRedis(Redis):
             **kwargs,
         )
         # Add data to Redis
-        print("Add data to redis - texts")
-        print(texts)
         keys = instance.add_text_image_pairs(texts, images, metadatas, keys=keys) if images else \
             instance.add_text(texts, metadatas, keys=keys)
         return instance, keys
@@ -282,7 +280,7 @@ def prepare_data_and_metadata_from_annotation(
         video_id = frame["video_id"]
         b64_img_str = frame["b64_img_str"]
         time_of_frame = frame["time"]
-        embedding_type = "pair"
+        embedding_type = "pair" if b64_img_str else "text"
         source_video = frame["video_name"]
 
         text_list.append(caption_for_ingesting)
@@ -320,13 +318,13 @@ def ingest_multimodal(videoname, data_folder, embeddings):
     num_transcript_concat_for_inference = 7 if has_frames else 0
 
     # prepare data to ingest
-    text_list, image_list, metadatas = prepare_data_and_metadata_from_annotation(annotation, path_to_frames, videoname,
-        num_transcript_concat_for_ingesting, num_transcript_concat_for_inference)
+    text_list, image_list, metadatas = prepare_data_and_metadata_from_annotation(annotation, path_to_frames, videoname) #,
+     #   num_transcript_concat_for_ingesting, num_transcript_concat_for_inference)
 
-    print("text list")
-    print(text_list)
-    print("image list")
-    print(image_list)
+    print("*" * 30)
+    print(text_list[0])
+    print(text_list[1])
+    print(text_list[2])
 
     MultimodalRedis.from_text_image_pairs_return_keys(
         texts=[f"From {videoname}. " + text for text in text_list],
@@ -415,13 +413,14 @@ async def ingest_videos_generate_transcripts(files: List[UploadFile] = File(None
             # Save transcript as vtt file and delete audio file
             vtt_file = dir_name + ".vtt"
             write_vtt(transcripts, os.path.join(upload_folder, vtt_file))
-            delete_audio_file(os.path.join(upload_folder, audio_file))
+            if is_video:
+                delete_audio_file(os.path.join(upload_folder, audio_file))
             print("Done extracting transcript.")
 
             if is_video:
                 # Store frames and caption annotations in a new directory
                 print("Extracting frames and generating annotation")
-                generate_annotations(
+                extract_frames_and_annotations_from_transcripts(
                     file_id,
                     os.path.join(upload_folder, file_name_with_id),
                     os.path.join(upload_folder, vtt_file),
@@ -437,18 +436,6 @@ async def ingest_videos_generate_transcripts(files: List[UploadFile] = File(None
                     os.path.join(upload_folder, dir_name),
                 )
    
-            # DEBUG
-            annotations_file = os.path.join(upload_folder, dir_name, "annotations.json")
-            print("annotations file: " + annotations_file)
-            with open(annotations_file, "r") as f:
-                import json
-                data = json.load(f)
-
-                for x in data:
-                    print("caption: " + x["caption"])
-                    print("frame_no: " + str(x["frame_no"]))
-                    print("sub_video_id: " + str(x["sub_video_id"]))
-
             print("Done extracting frames and generating annotation")
             # Delete temporary vtt file
             os.remove(os.path.join(upload_folder, vtt_file))
