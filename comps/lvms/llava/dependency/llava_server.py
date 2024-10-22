@@ -82,7 +82,7 @@ def pipeline_preprocess(self, image, prompt=None, timeout=None):
         if self.framework == "pt":
             model_inputs = model_inputs.to(self.torch_dtype)
     else:
-        raise ValueError("Both image and prompt cannot be empty.)
+        raise ValueError("Both image and prompt cannot be empty.")
 
     if self.model.config.model_type == "git" and prompt is None:
         model_inputs["input_ids"] = None
