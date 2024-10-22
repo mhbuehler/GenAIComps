@@ -312,14 +312,8 @@ def ingest_multimodal(videoname, data_folder, embeddings):
 
     annotation = load_json_file(annotation_file_path)
 
-    # If there's frame data along with the text, use neighboring parts of the transcript to increase context
-    has_frames = os.path.exists(path_to_frames)
-    num_transcript_concat_for_ingesting = 2 if has_frames else 0
-    num_transcript_concat_for_inference = 7 if has_frames else 0
-
     # prepare data to ingest
-    text_list, image_list, metadatas = prepare_data_and_metadata_from_annotation(annotation, path_to_frames, videoname) #,
-     #   num_transcript_concat_for_ingesting, num_transcript_concat_for_inference)
+    text_list, image_list, metadatas = prepare_data_and_metadata_from_annotation(annotation, path_to_frames, videoname))
 
     print("*" * 30)
     print(text_list[0])
