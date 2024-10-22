@@ -247,11 +247,6 @@ class MultimodalRedis(Redis):
             )
             ids.append(key)
 
-            # TODO: Is this not needed if we aren't batching?
-            # Write batch
-            # if i % batch_size == 0:
-            #     pipeline.execute()
-
         # Cleanup final batch
         pipeline.execute()
         return ids
@@ -266,7 +261,6 @@ def prepare_data_and_metadata_from_annotation(
     for i, frame in enumerate(annotation):
         frame_index = frame["sub_video_id"]
         path_to_frame = os.path.join(path_to_frames, f"frame_{frame_index}.png")
-
         # augment this frame's transcript with a reasonable number of neighboring frames' transcripts helps semantic retrieval
         lb_ingesting = max(0, i - num_transcript_concat_for_ingesting)
         ub_ingesting = min(len(annotation), i + num_transcript_concat_for_ingesting + 1)
@@ -314,11 +308,6 @@ def ingest_multimodal(videoname, data_folder, embeddings):
 
     # prepare data to ingest
     text_list, image_list, metadatas = prepare_data_and_metadata_from_annotation(annotation, path_to_frames, videoname))
-
-    print("*" * 30)
-    print(text_list[0])
-    print(text_list[1])
-    print(text_list[2])
 
     MultimodalRedis.from_text_image_pairs_return_keys(
         texts=[f"From {videoname}. " + text for text in text_list],
