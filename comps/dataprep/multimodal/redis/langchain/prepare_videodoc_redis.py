@@ -307,7 +307,7 @@ def ingest_multimodal(videoname, data_folder, embeddings):
     annotation = load_json_file(annotation_file_path)
 
     # prepare data to ingest
-    text_list, image_list, metadatas = prepare_data_and_metadata_from_annotation(annotation, path_to_frames, videoname))
+    text_list, image_list, metadatas = prepare_data_and_metadata_from_annotation(annotation, path_to_frames, videoname)
 
     MultimodalRedis.from_text_image_pairs_return_keys(
         texts=[f"From {videoname}. " + text for text in text_list],
