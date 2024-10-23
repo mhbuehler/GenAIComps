@@ -63,16 +63,15 @@ class TextImageDoc(BaseDoc):
     text: TextDoc = None
 
 
+class Base64ByteStrDoc(BaseDoc):
+    byte_str: str
+
 MultimodalDoc = Union[
+    Base64ByteStrDoc,
     TextDoc,
     ImageDoc,
     TextImageDoc,
 ]
-
-
-class Base64ByteStrDoc(BaseDoc):
-    byte_str: str
-
 
 class DocPath(BaseDoc):
     path: str
