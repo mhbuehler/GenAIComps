@@ -27,10 +27,11 @@ app = FastAPI()
 
 def pipeline_preprocess(self, image, prompt=None, timeout=None):
     """
-    This replaces the preprocess function used by the image-to-text pipeline. The built-in preprocess function
-    requires that an image is passed in, and will fail if the image parameter is null/empty. In order to support
-    multimodal use cases with the same pipeline, this preprocess function handles the case where there is no image
-    with the prompt.
+    This replaces the preprocess function used by the image-to-text pipeline
+    (https://github.com/huggingface/transformers/blob/main/src/transformers/pipelines/image_to_text.py).
+    The original transformers image-to-text pipeline preprocess function requires that an image is passed in, and will
+    fail if the image parameter is null/empty. In order to support multimodal use cases with the same pipeline, this
+    preprocess function handles the case where there is no image with the prompt.
     """
 
     if image:
@@ -119,15 +120,15 @@ async def generate(request: Request) -> Response:  # FIXME batch_size=1 for now,
     img_b64_str = request_dict.pop("img_b64_str")
     max_new_tokens = request_dict.pop("max_new_tokens", 100)
 
-    # Decode and Resize the image
     if img_b64_str:
+        # Decode and Resize the image
         image = PIL.Image.open(BytesIO(base64.b64decode(img_b64_str)))
         image = process_image(image)
-        # format the prompt
+        # format the prompt with an image
         prompt = f"<image>\nUSER: {prompt}\nASSISTANT:"
     else:
         image = None
-        # format the prompt
+        # format the prompt with text only
         prompt = f"USER: {prompt}\nASSISTANT:"
 
     if args.device == "hpu":

@@ -367,8 +367,6 @@ async def ingest_videos_generate_transcripts(files: List[UploadFile] = File(None
             with open(os.path.join(upload_folder, file_name_with_id), "wb") as f:
                 shutil.copyfileobj(file_to_ingest.file, f)
 
-            # TODO: What is the key used for? Can we add _wav and _mp4 to avoid conflicts when there's a video and
-            # audio file with the same name?
             uploaded_files_map[base_file_name] = file_name_with_id
 
             if is_video:
@@ -391,7 +389,6 @@ async def ingest_videos_generate_transcripts(files: List[UploadFile] = File(None
             # Extract transcript from audio
             print("Extracting transcript from audio")
             transcripts = extract_transcript_from_audio(whisper_model, os.path.join(upload_folder, audio_file))
-            print(transcripts)
 
             # Save transcript as vtt file and delete audio file
             vtt_file = dir_name + ".vtt"
@@ -430,7 +427,7 @@ async def ingest_videos_generate_transcripts(files: List[UploadFile] = File(None
             # Delete temporary video directory containing frames and annotations
             shutil.rmtree(os.path.join(upload_folder, dir_name))
 
-            print(f"Processed video {file_to_ingest.filename}")
+            print(f"Processed file {file_to_ingest.filename}")
             end = time.time()
             print(str(end - st))
 
