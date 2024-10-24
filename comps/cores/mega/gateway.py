@@ -700,6 +700,7 @@ class MultimodalQnAGateway(Gateway):
 
     # this overrides _handle_message method of Gateway
     def _handle_message(self, messages):
+        print("Printing messages --> ", messages)
         images = []
         messages_dicts = []
         if isinstance(messages, str):
@@ -721,6 +722,11 @@ class MultimodalQnAGateway(Gateway):
                         image_list = [
                             item["image_url"]["url"] for item in message["content"] if item["type"] == "image_url"
                         ]
+                        audio_list = [
+                            item["audio"] for item in message["content"] if item["type"] == "audio"
+                        ]
+                        if audio_list:
+                            messages_dict[msg_role] = (text, audio_list)
                         if image_list:
                             messages_dict[msg_role] = (text, image_list)
                         else:
@@ -736,10 +742,17 @@ class MultimodalQnAGateway(Gateway):
 
             if system_prompt:
                 prompt = system_prompt + "\n"
+            print("message_dicts is: ", messages_dicts)
             for messages_dict in messages_dicts:
+                print("message_dict in message_dicts is: ", messages_dict)
                 for i, (role, message) in enumerate(messages_dict.items()):
+                    print(i, role, message)
                     if isinstance(message, tuple):
-                        text, image_list = message
+                        # TODO check if items in messages[1] have type "audio"
+                        if messages[i]['content'][0]['type'] == "audio":
+                            text, audio_list = message
+                        else:
+                            text, image_list = message
                         if i == 0:
                             # do not add role for the very first message.
                             # this will be added by llava_server
@@ -750,25 +763,31 @@ class MultimodalQnAGateway(Gateway):
                                 prompt += role.upper() + ": " + text + "\n"
                             else:
                                 prompt += role.upper() + ":"
-                        for img in image_list:
-                            # URL
-                            if img.startswith("http://") or img.startswith("https://"):
-                                response = requests.get(img)
-                                image = Image.open(BytesIO(response.content)).convert("RGBA")
-                                image_bytes = BytesIO()
-                                image.save(image_bytes, format="PNG")
-                                img_b64_str = base64.b64encode(image_bytes.getvalue()).decode()
-                            # Local Path
-                            elif os.path.exists(img):
-                                image = Image.open(img).convert("RGBA")
-                                image_bytes = BytesIO()
-                                image.save(image_bytes, format="PNG")
-                                img_b64_str = base64.b64encode(image_bytes.getvalue()).decode()
-                            # Bytes
-                            else:
-                                img_b64_str = img
+                        if image_list:
+                            for img in image_list:
+                                # URL
+                                if img.startswith("http://") or img.startswith("https://"):
+                                    response = requests.get(img)
+                                    image = Image.open(BytesIO(response.content)).convert("RGBA")
+                                    image_bytes = BytesIO()
+                                    image.save(image_bytes, format="PNG")
+                                    img_b64_str = base64.b64encode(image_bytes.getvalue()).decode()
+                                # Local Path
+                                elif os.path.exists(img):
+                                    image = Image.open(img).convert("RGBA")
+                                    image_bytes = BytesIO()
+                                    image.save(image_bytes, format="PNG")
+                                    img_b64_str = base64.b64encode(image_bytes.getvalue()).decode()
+                                # Bytes
+                                else:
+                                    img_b64_str = img
 
-                            images.append(img_b64_str)
+                                images.append(img_b64_str)
+                        if audio_list:
+                            for audio in audio_list:
+                                audio = base64.b64decode(audio)
+                                print("audio is: ", audio)
+
                     else:
                         if i == 0:
                             # do not add role for the very first message.
