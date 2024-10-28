@@ -334,7 +334,7 @@ def drop_index(index_name, redis_url=REDIS_URL):
 @register_microservice(
     name="opea_service@prepare_videodoc_redis", endpoint="/v1/generate_transcripts", host="0.0.0.0", port=6007
 )
-async def ingest_videos_generate_transcripts(files: List[UploadFile] = File(None)):
+async def ingest_generate_transcripts(files: List[UploadFile] = File(None)):
     """Upload videos or audio files with speech, generate transcripts using whisper and ingest into redis."""
 
     if files:
