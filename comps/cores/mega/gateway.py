@@ -767,8 +767,11 @@ class MultimodalQnAGateway(Gateway):
     def _handle_message(self, messages):
         print("Printing messages --> ", messages)
         images = []
+        b64_types = {}
         messages_dicts = []
         if isinstance(messages, str):
+            # check if its audio. Might be Easier to check type
+            messages[0]["content"][0]["type"] == "audio"
             prompt = messages
         else:
             messages_dict = {}
@@ -787,11 +790,9 @@ class MultimodalQnAGateway(Gateway):
                         image_list = [
                             item["image_url"]["url"] for item in message["content"] if item["type"] == "image_url"
                         ]
-                        audio_list = [
+                        audios = [
                             item["audio"] for item in message["content"] if item["type"] == "audio"
                         ]
-                        if audio_list:
-                            messages_dict[msg_role] = (text, audio_list)
                         if image_list:
                             messages_dict[msg_role] = (text, image_list)
                         else:
@@ -813,11 +814,7 @@ class MultimodalQnAGateway(Gateway):
                 for i, (role, message) in enumerate(messages_dict.items()):
                     print(i, role, message)
                     if isinstance(message, tuple):
-                        # TODO check if items in messages[1] have type "audio"
-                        if messages[i]['content'][0]['type'] == "audio":
-                            text, audio_list = message
-                        else:
-                            text, image_list = message
+                        text, image_list = message
                         if i == 0:
                             # do not add role for the very first message.
                             # this will be added by llava_server
@@ -848,10 +845,6 @@ class MultimodalQnAGateway(Gateway):
                                     img_b64_str = img
 
                                 images.append(img_b64_str)
-                        if audio_list:
-                            for audio in audio_list:
-                                audio = base64.b64decode(audio)
-                                print("audio is: ", audio)
 
                     else:
                         if i == 0:
@@ -863,9 +856,16 @@ class MultimodalQnAGateway(Gateway):
                             if message:
                                 prompt += role.upper() + ": " + message + "\n"
                             else:
-                                prompt += role.upper() + ":"
+                                prompt += role.upper() + ":" 
         if images:
-            return prompt, images
+            b64_types["image"] = images
+        if audios:
+            b64_types["audio"] = audios        
+
+        if images:
+            return prompt, b64_types
+        elif audios:
+            return (audios if prompt == "" else (prompt, b64_types))
         else:
             return prompt
 
@@ -877,15 +877,21 @@ class MultimodalQnAGateway(Gateway):
             stream_opt = False
         chat_request = ChatCompletionRequest.model_validate(data)
         # Multimodal RAG QnA With Videos has not yet accepts image as input during QnA.
-        prompt_and_image = self._handle_message(chat_request.messages)
-        if isinstance(prompt_and_image, tuple):
-            # print(f"This request include image, thus it is a follow-up query. Using lvm megaservice")
-            prompt, images = prompt_and_image
+        messages = self._handle_message(chat_request.messages)
+        if isinstance(messages, tuple):
+            # print(f"This request include image and / or audio, thus it is a follow-up query. Using lvm megaservice")
+            prompt, b64_types = messages
             cur_megaservice = self.lvm_megaservice
-            initial_inputs = {"prompt": prompt, "image": images[0]}
+            if "image" in b64_types and "audio" in b64_types:
+                initial_inputs = {"prompt": prompt, "image": b64_types["image"][0], "audio": b64_types["audio"][0]}
+            elif "image" in b64_types:
+                initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
+            elif "audio" in b64_types:
+                initial_inputs = {"prompt": prompt, "audio": b64_types["audio"][0]}
+    
         else:
             # print(f"This is the first query, requiring multimodal retrieval. Using multimodal rag megaservice")
-            prompt = prompt_and_image
+            prompt = messages
             cur_megaservice = self.megaservice
             initial_inputs = {"text": prompt}
 
