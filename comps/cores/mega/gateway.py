@@ -771,8 +771,6 @@ class MultimodalQnAGateway(Gateway):
         b64_types = {}
         messages_dicts = []
         if isinstance(messages, str):
-            # check if its audio. Might be Easier to check type
-            messages[0]["content"][0]["type"] == "audio"
             prompt = messages
         else:
             messages_dict = {}
