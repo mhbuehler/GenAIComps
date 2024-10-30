@@ -768,6 +768,7 @@ class MultimodalQnAGateway(Gateway):
     def _handle_message(self, messages):
         print("Printing messages --> ", messages)
         images = []
+        audios = []
         b64_types = {}
         messages_dicts = []
         if isinstance(messages, str):
