@@ -795,6 +795,8 @@ class MultimodalQnAGateway(Gateway):
                         ]
                         if image_list:
                             messages_dict[msg_role] = (text, image_list)
+                        elif audios:
+                            messages_dict[msg_role] = audios
                         else:
                             messages_dict[msg_role] = text
                     else:
