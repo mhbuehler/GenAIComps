@@ -870,7 +870,9 @@ class MultimodalQnAGateway(Gateway):
             return prompt
 
     async def handle_request(self, request: Request):
+        print("REQUEST IS: ", request)
         data = await request.json()
+        print("DATA IS ", data)
         stream_opt = bool(data.get("stream", False))
         if stream_opt:
             print("[ MultimodalQnAGateway ] stream=True not used, this has not support streaming yet!")
