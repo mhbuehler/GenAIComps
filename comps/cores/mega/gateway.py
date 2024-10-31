@@ -848,7 +848,7 @@ class MultimodalQnAGateway(Gateway):
 
                                 images.append(img_b64_str)
 
-                    elif isinstance(message, text):
+                    elif isinstance(message, str):
                         # check if audio
                         if i == 0:
                             # do not add role for the very first message.
