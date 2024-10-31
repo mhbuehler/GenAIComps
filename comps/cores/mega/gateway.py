@@ -921,6 +921,8 @@ class MultimodalQnAGateway(Gateway):
             initial_inputs=initial_inputs, llm_parameters=parameters
         )
         for node, response in result_dict.items():
+            print("NODE ", node)
+            print("RESPONSE", response)
             # the last microservice in this megaservice is LVM.
             # checking if LVM returns StreamingResponse
             # Currently, LVM with LLAVA has not yet supported streaming.
@@ -950,6 +952,7 @@ class MultimodalQnAGateway(Gateway):
             metadata = None
         choices = []
         usage = UsageInfo()
+        print("RESPONSE IS ", response)
         choices.append(
             ChatCompletionResponseChoice(
                 index=0,
