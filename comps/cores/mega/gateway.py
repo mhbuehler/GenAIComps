@@ -895,13 +895,14 @@ class MultimodalQnAGateway(Gateway):
             elif "image" in b64_types:
                 initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
             elif "audio" in b64_types:
-                initial_inputs = {"prompt": prompt, "audio": b64_types["audio"][0]}
+                initial_inputs = {"prompt": prompt, "byte_str": b64_types["audio"][0]}
     
         else:
             # print(f"This is the first query, requiring multimodal retrieval. Using multimodal rag megaservice")
             cur_megaservice = self.megaservice
             if isinstance(messages, list):
-                initial_inputs = {"audio": messages[0]}
+                initial_inputs = {"byte_str": messages[0]}
+                print(initial_inputs)
             else:
                 prompt = messages
                 initial_inputs = {"text": prompt}
