@@ -848,7 +848,8 @@ class MultimodalQnAGateway(Gateway):
 
                                 images.append(img_b64_str)
 
-                    else:
+                    elif isinstance(message, text):
+                        # check if audio
                         if i == 0:
                             # do not add role for the very first message.
                             # this will be added by llava_server
@@ -859,15 +860,18 @@ class MultimodalQnAGateway(Gateway):
                                 prompt += role.upper() + ": " + message + "\n"
                             else:
                                 prompt += role.upper() + ":" 
+
+                    # else, it is an audio list. No action needed
+
         if images:
             b64_types["image"] = images
         if audios:
             b64_types["audio"] = audios        
 
-        if images:
+        if images: # if images are passed, return b64 types which may have audio. Image must be with text
             return prompt, b64_types
-        elif audios:
-            return (audios if prompt == "" else (prompt, b64_types))
+        elif audios: # if only audios is present, return audios
+            return audios # if prompt == "" else (prompt, b64_types))
         else:
             return prompt
 
@@ -895,9 +899,12 @@ class MultimodalQnAGateway(Gateway):
     
         else:
             # print(f"This is the first query, requiring multimodal retrieval. Using multimodal rag megaservice")
-            prompt = messages
             cur_megaservice = self.megaservice
-            initial_inputs = {"text": prompt}
+            if isinstance(messages, list):
+                initial_inputs = {"audio": messages[0]}
+            else:
+                prompt = messages
+                initial_inputs = {"text": prompt}
 
         parameters = LLMParams(
             max_new_tokens=chat_request.max_tokens if chat_request.max_tokens else 1024,
