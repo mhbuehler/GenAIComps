@@ -2,13 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import base64
+import json
 import os
 from io import BytesIO
 from typing import List, Union
 
 import requests
 from fastapi import File, Request, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from PIL import Image
 
 from ..proto.api_protocol import (
@@ -753,6 +754,8 @@ class RetrievalToolGateway(Gateway):
 
 
 class MultimodalQnAGateway(Gateway):
+    asr_port = int(os.getenv("ASR_SERVICE_PORT", 3001))
+    asr_endpoint = os.getenv("ASR_SERVICE_ENDPOINT", "http://0.0.0.0:{}/v1/audio/transcriptions".format(asr_port))
     def __init__(self, multimodal_rag_megaservice, lvm_megaservice, host="0.0.0.0", port=9999):
         self.lvm_megaservice = lvm_megaservice
         super().__init__(
@@ -763,7 +766,6 @@ class MultimodalQnAGateway(Gateway):
             ChatCompletionRequest,
             ChatCompletionResponse,
         )
-
     # this overrides _handle_message method of Gateway
     def _handle_message(self, messages):
         print("Printing messages --> ", messages)
@@ -889,23 +891,44 @@ class MultimodalQnAGateway(Gateway):
         if isinstance(messages, tuple):
             # print(f"This request include image and / or audio, thus it is a follow-up query. Using lvm megaservice")
             prompt, b64_types = messages
+            decoded_audio_input = ""
+            if "audio" in b64_types:
+                # call ASR endpoint to decode audio to text             
+                input_dict = {"byte_str": b64_types["audio"][0]}
+                response = requests.post(self.asr_endpoint, data=json.dumps(input_dict), proxies={"http": None})
+                
+                if response.status_code != 200:
+                    return JSONResponse(status_code=503, content={"message": "Unable to convert audio to text. {}".format(
+                        response.text)})
+
+                response = response.json()
+                # The rest of the code should be treated the same as text input
+                decoded_audio_input = response["query"]
+
             cur_megaservice = self.lvm_megaservice
-            if "image" in b64_types and "audio" in b64_types:
-                initial_inputs = {"prompt": prompt, "image": b64_types["image"][0], "audio": b64_types["audio"][0]}
+            if "image" in b64_types and decoded_audio_input:
+                initial_inputs = {"prompt": decoded_audio_input, "image": b64_types["image"][0]}
             elif "image" in b64_types:
                 initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
-            elif "audio" in b64_types:
-                initial_inputs = {"prompt": prompt, "byte_str": b64_types["audio"][0]}
-    
+        elif isinstance(messages, list):
+            # call ASR endpoint to decode audio to text 
+            input_dict = {"byte_str": b64_types["audio"][0]}
+            response = requests.post(self.asr_endpoint, data=json.dumps(input_dict), proxies={"http": None})
+            
+            if response.status_code != 200:
+                return JSONResponse(status_code=503, content={"message": "Unable to convert audio to text. {}".format(
+                    response.text)})
+
+            response = response.json()
+            # The rest of the code should be treated the same as text input
+            cur_megaservice = self.megaservice
+            initial_inputs = {"text": response["query"]}
+        
         else:
             # print(f"This is the first query, requiring multimodal retrieval. Using multimodal rag megaservice")
             cur_megaservice = self.megaservice
-            if isinstance(messages, list):
-                initial_inputs = {"byte_str": messages[0]}
-                print(initial_inputs)
-            else:
-                prompt = messages
-                initial_inputs = {"text": prompt}
+            prompt = messages
+            initial_inputs = {"text": prompt}
 
         parameters = LLMParams(
             max_new_tokens=chat_request.max_tokens if chat_request.max_tokens else 1024,
