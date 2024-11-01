@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import base64
-import json
 import os
 import time
 
@@ -27,8 +26,6 @@ from comps import (
 logger = CustomLogger("multimodal_embedding_mmei_langchain")
 logflag = os.getenv("LOGFLAG", False)
 port = int(os.getenv("MM_EMBEDDING_PORT_MICROSERVICE", 6600))
-asr_port = int(os.getenv("ASR_SERVICE_PORT", 3001))
-asr_endpoint = os.getenv("ASR_SERVICE_ENDPOINT", "http://0.0.0.0:{}/v1/audio/transcriptions".format(asr_port))
 headers = {"Content-Type": "application/json"}
 
 
@@ -55,20 +52,6 @@ def embedding(input: MultimodalDoc) -> EmbedDoc:
         img_bytes = input.image.url.load_bytes()
         base64_img = base64.b64encode(img_bytes).decode("utf-8")
         json_input["img_b64_str"] = base64_img
-    elif isinstance(input, Base64ByteStrDoc):
-        # b64 encoded audio input
-        input_dict = {"byte_str": input.byte_str}
-        response = requests.post(asr_endpoint, data=json.dumps(input_dict), proxies={"http": None})
-        
-        if response.status_code != 200:
-            return JSONResponse(status_code=503, content={"message": "Unable to convert audio to text. {}".format(
-                response.text)})
-
-        response = response.json()
-        json_input["text"] = response["query"]
-
-        # The rest of the code should be treated the same as text input
-        input = TextDoc(text=json_input["text"])
     else:
         return JSONResponse(status_code=400, content={"message": "Bad request!"})
 
