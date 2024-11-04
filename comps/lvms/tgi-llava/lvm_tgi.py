@@ -94,7 +94,7 @@ async def lvm(request: Union[LVMDoc, LVMSearchedMultimodalDoc]) -> Union[TextDoc
         # Work around an issue where LLaVA-NeXT is not providing good responses when prompted without an image.
         # Provide an image and then instruct the model to ignore the image.
         image = "https://raw.githubusercontent.com/opea-project/GenAIExamples/refs/tags/v1.0/AudioQnA/ui/svelte/src/lib/assets/icons/png/audio1.png"
-        prompt = f"Please disregard the image and then answer the question. {prompt}"
+        prompt = f"Please disregard the image and answer the question. {prompt}"
 
     image_prompt = f"![]({image})\n{prompt}\nASSISTANT:"
 
