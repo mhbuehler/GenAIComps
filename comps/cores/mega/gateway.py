@@ -912,7 +912,7 @@ class MultimodalQnAGateway(Gateway):
                 initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
         elif isinstance(messages, list):
             # call ASR endpoint to decode audio to text 
-            input_dict = {"byte_str": b64_types["audio"][0]}
+            input_dict = {"byte_str": messages[0]}
             response = requests.post(self.asr_endpoint, data=json.dumps(input_dict), proxies={"http": None})
             
             if response.status_code != 200:
