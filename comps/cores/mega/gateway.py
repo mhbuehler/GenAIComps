@@ -768,7 +768,6 @@ class MultimodalQnAGateway(Gateway):
         )
     # this overrides _handle_message method of Gateway
     def _handle_message(self, messages):
-        print("Printing messages --> ", messages)
         images = []
         audios = []
         b64_types = {}
@@ -812,11 +811,8 @@ class MultimodalQnAGateway(Gateway):
 
             if system_prompt:
                 prompt = system_prompt + "\n"
-            print("message_dicts is: ", messages_dicts)
             for messages_dict in messages_dicts:
-                print("message_dict in message_dicts is: ", messages_dict)
                 for i, (role, message) in enumerate(messages_dict.items()):
-                    print(i, role, message)
                     if isinstance(message, tuple):
                         text, image_list = message
                         if i == 0:
@@ -851,7 +847,6 @@ class MultimodalQnAGateway(Gateway):
                                 images.append(img_b64_str)
 
                     elif isinstance(message, str):
-                        # check if audio
                         if i == 0:
                             # do not add role for the very first message.
                             # this will be added by llava_server
@@ -873,14 +868,12 @@ class MultimodalQnAGateway(Gateway):
         if images: # if images are passed, return b64 types which may have audio. Image must be with text
             return prompt, b64_types
         elif audios: # if only audios is present, return audios
-            return audios # if prompt == "" else (prompt, b64_types))
+            return audios
         else:
             return prompt
 
     async def handle_request(self, request: Request):
-        print("REQUEST IS: ", request)
         data = await request.json()
-        print("DATA IS ", data)
         stream_opt = bool(data.get("stream", False))
         if stream_opt:
             print("[ MultimodalQnAGateway ] stream=True not used, this has not support streaming yet!")
@@ -889,7 +882,7 @@ class MultimodalQnAGateway(Gateway):
         # Multimodal RAG QnA With Videos has not yet accepts image as input during QnA.
         messages = self._handle_message(chat_request.messages)
         if isinstance(messages, tuple):
-            # print(f"This request include image and / or audio, thus it is a follow-up query. Using lvm megaservice")
+            # print(f"This request include image, thus it is a follow-up query. Using lvm megaservice")
             prompt, b64_types = messages
             decoded_audio_input = ""
             if "audio" in b64_types:
@@ -945,8 +938,6 @@ class MultimodalQnAGateway(Gateway):
             initial_inputs=initial_inputs, llm_parameters=parameters
         )
         for node, response in result_dict.items():
-            print("NODE ", node)
-            print("RESPONSE", response)
             # the last microservice in this megaservice is LVM.
             # checking if LVM returns StreamingResponse
             # Currently, LVM with LLAVA has not yet supported streaming.
@@ -976,7 +967,6 @@ class MultimodalQnAGateway(Gateway):
             metadata = None
         choices = []
         usage = UsageInfo()
-        print("RESPONSE IS ", response)
         choices.append(
             ChatCompletionResponseChoice(
                 index=0,
