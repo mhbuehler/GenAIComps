@@ -9,7 +9,6 @@ import requests
 from fastapi.responses import JSONResponse
 
 from comps import (
-    Base64ByteStrDoc,
     CustomLogger,
     EmbedDoc,
     EmbedMultimodalDoc,
