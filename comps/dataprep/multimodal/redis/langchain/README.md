@@ -1,9 +1,10 @@
 # Dataprep Microservice for Multimodal Data with Redis
 
-This `dataprep` microservice accepts the following from the user and ingests them into a Redis vectorstore:
-* Videos (mp4 files) and their transcripts (optional)
-* Images (gif, jpg, jpeg, and png files) and their captions (optional)
-* Audio (wav files)
+This `dataprep` microservice accepts the following from the user and ingests them into a Redis vector store:
+
+- Videos (mp4 files) and their transcripts (optional)
+- Images (gif, jpg, jpeg, and png files) and their captions (optional)
+- Audio (wav files)
 
 ## 🚀1. Start Microservice with Python（Option 1）
 
@@ -112,7 +113,7 @@ docker container logs -f dataprep-multimodal-redis
 
 Once this dataprep microservice is started, user can use the below commands to invoke the microservice to convert images and videos and their transcripts (optional) to embeddings and save to the Redis vector store.
 
-This microservice has provided 3 different ways for users to ingest files into Redis vector store corresponding to the 3 use cases.
+This microservice provides 3 different ways for users to ingest files into Redis vector store corresponding to the 3 use cases.
 
 ### 4.1 Consume _ingest_with_text_ API
 
