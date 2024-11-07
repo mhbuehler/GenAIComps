@@ -871,6 +871,23 @@ class MultimodalQnAGateway(Gateway):
             return audios
         else:
             return prompt
+        
+    def convert_audio_to_text(self, audio):
+        if isinstance(audio, dict):
+            input_dict = {"byte_str": audio["audio"][0]}
+        else:
+            input_dict = {"byte_str": audio[0]}
+
+        response = requests.post(self.asr_endpoint, data=json.dumps(input_dict), proxies={"http": None})
+            
+        if response.status_code != 200:
+            return JSONResponse(status_code=503, content={"message": "Unable to convert audio to text. {}".format(
+                response.text)})
+
+        response = response.json()
+        # The rest of the code should be treated the same as text input
+        return response["query"]
+
 
     async def handle_request(self, request: Request):
         data = await request.json()
@@ -887,16 +904,7 @@ class MultimodalQnAGateway(Gateway):
             decoded_audio_input = ""
             if "audio" in b64_types:
                 # call ASR endpoint to decode audio to text             
-                input_dict = {"byte_str": b64_types["audio"][0]}
-                response = requests.post(self.asr_endpoint, data=json.dumps(input_dict), proxies={"http": None})
-                
-                if response.status_code != 200:
-                    return JSONResponse(status_code=503, content={"message": "Unable to convert audio to text. {}".format(
-                        response.text)})
-
-                response = response.json()
-                # The rest of the code should be treated the same as text input
-                decoded_audio_input = response["query"]
+                decoded_audio_input = self.convert_audio_to_text(self, b64_types)
 
             cur_megaservice = self.lvm_megaservice
             if "image" in b64_types and decoded_audio_input:
@@ -905,18 +913,7 @@ class MultimodalQnAGateway(Gateway):
                 initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
         elif isinstance(messages, list):
             # call ASR endpoint to decode audio to text 
-            input_dict = {"byte_str": messages[0]}
-            response = requests.post(self.asr_endpoint, data=json.dumps(input_dict), proxies={"http": None})
-            
-            if response.status_code != 200:
-                return JSONResponse(status_code=503, content={"message": "Unable to convert audio to text. {}".format(
-                    response.text)})
-
-            response = response.json()
-            # The rest of the code should be treated the same as text input
-            cur_megaservice = self.megaservice
-            initial_inputs = {"text": response["query"]}
-        
+            decoded_audio_input = self.convert_audio_to_text(self, messages)
         else:
             # print(f"This is the first query, requiring multimodal retrieval. Using multimodal rag megaservice")
             cur_megaservice = self.megaservice
