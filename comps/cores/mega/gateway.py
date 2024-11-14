@@ -869,7 +869,7 @@ class MultimodalQnAGateway(Gateway):
         if audios:
             b64_types["audio"] = audios        
 
-        if images: # if images are passed, return b64 types which may have audio. Image must be with text
+        if prompt and b64_types: # if the query has multiple types, it is a follow up query. Return all types
             return prompt, b64_types
         elif audios: # if only audios is present, return audios
             return audios
@@ -908,16 +908,17 @@ class MultimodalQnAGateway(Gateway):
             decoded_audio_input = ""
             if "audio" in b64_types:
                 # call ASR endpoint to decode audio to text             
-                decoded_audio_input = self.convert_audio_to_text(self, b64_types)
+                decoded_audio_input = self.convert_audio_to_text(b64_types)
 
             cur_megaservice = self.lvm_megaservice
             if "image" in b64_types and decoded_audio_input:
                 initial_inputs = {"prompt": decoded_audio_input, "image": b64_types["image"][0]}
             elif "image" in b64_types:
                 initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
+
         elif isinstance(messages, list):
             # call ASR endpoint to decode audio to text 
-            decoded_audio_input = self.convert_audio_to_text(self, messages)
+            decoded_audio_input = self.convert_audio_to_text(messages)
             initial_inputs = {"text": decoded_audio_input}
         else:
             # print(f"This is the first query, requiring multimodal retrieval. Using multimodal rag megaservice")
