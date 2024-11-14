@@ -923,6 +923,7 @@ class MultimodalQnAGateway(Gateway):
 
         elif isinstance(messages, list):
             # call ASR endpoint to decode audio to text 
+            cur_megaservice = self.megaservice
             decoded_audio_input = self.convert_audio_to_text(messages)
             initial_inputs = {"text": decoded_audio_input}
         else:
