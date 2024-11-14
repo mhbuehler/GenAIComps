@@ -295,8 +295,8 @@ def extract_frames_and_generate_captions(
                     "video_name": os.path.basename(video_path),
                     "b64_img_str": b64_img_str,
                     "caption": text,
-                    "time": mid_time_ms if is_video else 0.0,
-                    "frame_no": frame_no if is_video else 0,
+                    "time": mid_time_ms if is_video else 0.0,  # Use calculated time for videos, set to 0.0 for images
+                    "frame_no": frame_no if is_video else 0,  # Use calculated frame for videos, set to 0 for images
                     "sub_video_id": idx,
                 }
             )
