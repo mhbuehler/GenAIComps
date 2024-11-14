@@ -915,6 +915,11 @@ class MultimodalQnAGateway(Gateway):
                 initial_inputs = {"prompt": decoded_audio_input, "image": b64_types["image"][0]}
             elif "image" in b64_types:
                 initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
+            elif decoded_audio_input:
+                initial_inputs = {"prompt": decoded_audio_input}
+            else:
+                initial_inputs = {"prompt": prompt}
+            
 
         elif isinstance(messages, list):
             # call ASR endpoint to decode audio to text 
