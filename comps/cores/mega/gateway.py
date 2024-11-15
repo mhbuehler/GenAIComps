@@ -895,6 +895,7 @@ class MultimodalQnAGateway(Gateway):
 
     async def handle_request(self, request: Request):
         data = await request.json()
+        print("Request data is ", data)
         stream_opt = bool(data.get("stream", False))
         if stream_opt:
             print("[ MultimodalQnAGateway ] stream=True not used, this has not support streaming yet!")
@@ -943,6 +944,7 @@ class MultimodalQnAGateway(Gateway):
             streaming=stream_opt,
             chat_template=chat_request.chat_template if chat_request.chat_template else None,
         )
+        print("initial_inputs is ", initial_inputs)
         result_dict, runtime_graph = await cur_megaservice.schedule(
             initial_inputs=initial_inputs, llm_parameters=parameters
         )
