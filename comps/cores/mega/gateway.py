@@ -884,9 +884,9 @@ class MultimodalQnAGateway(Gateway):
         
     def convert_audio_to_text(self, audio):
         if isinstance(audio, dict):
-            input_dict = {"byte_str": audio["audio"]}
+            input_dict = {"byte_str": audio["audio"][0]}
         else:
-            input_dict = {"byte_str": audio}
+            input_dict = {"byte_str": audio[0]}
 
         print("INPUT_DICT IS: ", input_dict)
         response = requests.post(self.asr_endpoint, data=json.dumps(input_dict), proxies={"http": None})
