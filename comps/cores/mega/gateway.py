@@ -797,7 +797,6 @@ class MultimodalQnAGateway(Gateway):
                         ]
                         audios = [
                             item["audio"] for item in message["content"] if item["type"] == "audio"
-                            # translate here? it becomes text, use same alg as text above?
                         ]
                         if image_list:
                             messages_dict[msg_role] = (text, image_list)
@@ -850,11 +849,6 @@ class MultimodalQnAGateway(Gateway):
                                     img_b64_str = img
 
                                 images.append(img_b64_str)
-                        if audios:
-                            # translate here
-                            #for audio in audios:
-                            audios = self.convert_audio_to_text(audios)
-                            print(audios)
 
                     elif isinstance(message, str):
                         if i == 0:
@@ -918,14 +912,12 @@ class MultimodalQnAGateway(Gateway):
             if "audio" in b64_types:
                 # call ASR endpoint to decode audio to text             
                 decoded_audio_input = self.convert_audio_to_text(b64_types)
-
+                # translate all and append to prompt properly
             cur_megaservice = self.lvm_megaservice
-            if "image" in b64_types and decoded_audio_input:
-                initial_inputs = {"prompt": decoded_audio_input, "image": b64_types["image"][0]}
-            elif "image" in b64_types:
+            if "image" in b64_types:
                 initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
             elif decoded_audio_input:
-                initial_inputs = {"prompt": decoded_audio_input}
+                initial_inputs = {"prompt": prompt + decoded_audio_input}
             else:
                 initial_inputs = {"prompt": prompt}
             
