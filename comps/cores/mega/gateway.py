@@ -912,7 +912,8 @@ class MultimodalQnAGateway(Gateway):
             if "audio" in b64_types:
                 # call ASR endpoint to decode audio to text             
                 decoded_audio_input = self.convert_audio_to_text(b64_types)
-                # translate all and append to prompt properly
+                decoded_audio_input = "USER: " + decoded_audio_input + '\n'
+                # audio will always come from the user
             cur_megaservice = self.lvm_megaservice
             if "image" in b64_types:
                 initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
