@@ -918,9 +918,9 @@ class MultimodalQnAGateway(Gateway):
             if "image" in b64_types:
                 initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
             elif decoded_audio_input:
-                initial_inputs = {"prompt": prompt + decoded_audio_input}
+                initial_inputs = {"text": prompt + decoded_audio_input}
             else:
-                initial_inputs = {"prompt": prompt}
+                initial_inputs = {"text": prompt}
             
 
         elif isinstance(messages, list):
