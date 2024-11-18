@@ -797,6 +797,7 @@ class MultimodalQnAGateway(Gateway):
                         ]
                         audios = [
                             item["audio"] for item in message["content"] if item["type"] == "audio"
+                            # translate here? it becomes text, use same alg as text above?
                         ]
                         if image_list:
                             messages_dict[msg_role] = (text, image_list)
@@ -849,6 +850,11 @@ class MultimodalQnAGateway(Gateway):
                                     img_b64_str = img
 
                                 images.append(img_b64_str)
+                        if audios:
+                            # translate here
+                            #for audio in audios:
+                            audios = self.convert_audio_to_text(audios)
+                            print(audios)
 
                     elif isinstance(message, str):
                         if i == 0:
@@ -878,10 +884,11 @@ class MultimodalQnAGateway(Gateway):
         
     def convert_audio_to_text(self, audio):
         if isinstance(audio, dict):
-            input_dict = {"byte_str": audio["audio"][0]}
+            input_dict = {"byte_str": audio["audio"]}
         else:
-            input_dict = {"byte_str": audio[0]}
+            input_dict = {"byte_str": audio}
 
+        print("INPUT_DICT IS: ", input_dict)
         response = requests.post(self.asr_endpoint, data=json.dumps(input_dict), proxies={"http": None})
             
         if response.status_code != 200:
@@ -889,6 +896,7 @@ class MultimodalQnAGateway(Gateway):
                 response.text)})
 
         response = response.json()
+        print("TRANSLATION RESPONSE: ", response)
         # The rest of the code should be treated the same as text input
         return response["query"]
 
