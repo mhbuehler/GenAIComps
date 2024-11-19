@@ -916,7 +916,7 @@ class MultimodalQnAGateway(Gateway):
                 # audio will always come from the user
             cur_megaservice = self.lvm_megaservice
             if "image" in b64_types:
-                initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
+                initial_inputs = {"prompt": prompt + decoded_audio_input, "image": b64_types["image"][0]}
             elif decoded_audio_input:
                 initial_inputs = {"text": prompt + decoded_audio_input}
             else:
@@ -950,6 +950,7 @@ class MultimodalQnAGateway(Gateway):
             initial_inputs=initial_inputs, llm_parameters=parameters
         )
         for node, response in result_dict.items():
+            print("RESPONSE IS: ", response)
             # the last microservice in this megaservice is LVM.
             # checking if LVM returns StreamingResponse
             # Currently, LVM with LLAVA has not yet supported streaming.
@@ -977,6 +978,7 @@ class MultimodalQnAGateway(Gateway):
         else:
             # follow-up question, no retrieval
             metadata = None
+        print("RESPONSE IS PASSED IN AS: ", response)
         choices = []
         usage = UsageInfo()
         choices.append(
