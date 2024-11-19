@@ -882,7 +882,6 @@ class MultimodalQnAGateway(Gateway):
         else:
             input_dict = {"byte_str": audio[0]}
 
-        print("INPUT_DICT IS: ", input_dict)
         response = requests.post(self.asr_endpoint, data=json.dumps(input_dict), proxies={"http": None})
             
         if response.status_code != 200:
@@ -890,14 +889,12 @@ class MultimodalQnAGateway(Gateway):
                 response.text)})
 
         response = response.json()
-        print("TRANSLATION RESPONSE: ", response)
         # The rest of the code should be treated the same as text input
         return response["query"]
 
 
     async def handle_request(self, request: Request):
         data = await request.json()
-        print("Request data is ", data)
         stream_opt = bool(data.get("stream", False))
         if stream_opt:
             print("[ MultimodalQnAGateway ] stream=True not used, this has not support streaming yet!")
@@ -945,12 +942,10 @@ class MultimodalQnAGateway(Gateway):
             streaming=stream_opt,
             chat_template=chat_request.chat_template if chat_request.chat_template else None,
         )
-        print("initial_inputs is ", initial_inputs)
         result_dict, runtime_graph = await cur_megaservice.schedule(
             initial_inputs=initial_inputs, llm_parameters=parameters
         )
         for node, response in result_dict.items():
-            print("RESPONSE IS: ", response)
             # the last microservice in this megaservice is LVM.
             # checking if LVM returns StreamingResponse
             # Currently, LVM with LLAVA has not yet supported streaming.
@@ -978,7 +973,6 @@ class MultimodalQnAGateway(Gateway):
         else:
             # follow-up question, no retrieval
             metadata = None
-        print("RESPONSE IS PASSED IN AS: ", response)
         choices = []
         usage = UsageInfo()
         choices.append(
