@@ -1,6 +1,7 @@
 # Copyright (C) 2024 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+import logging
 import re
 from typing import Optional
 
@@ -34,18 +35,7 @@ class HTTPService(BaseService):
         self.uvicorn_kwargs = uvicorn_kwargs or {}
         self.cors = cors
         self._app = self._create_app()
-
-        # remove part before '@', used by register_microservice() callers, and
-        # part after '/', added by MicroService(), to get real service name, and
-        # convert invalid characters to '_'
-        suffix = re.sub(r"[^a-zA-Z0-9]", "_", self.title.split("/")[0].split("@")[-1].lower())
-
-        instrumentator = Instrumentator(
-            inprogress_name=f"http_requests_inprogress_{suffix}",
-            should_instrument_requests_inprogress=True,
-            inprogress_labels=True,
-        )
-        instrumentator.instrument(self._app).expose(self._app)
+        Instrumentator().instrument(self._app).expose(self._app)
 
     @property
     def app(self):
@@ -131,6 +121,7 @@ class HTTPService(BaseService):
                 **self.uvicorn_kwargs,
             )
         )
+        logging.getLogger("uvicorn.access").addFilter(lambda record: "/v1/health_check" not in record.getMessage())
         self.logger.info(f"Uvicorn server setup on port {self.primary_port}")
         await self.server.setup_server()
         self.logger.info("HTTP server setup successful")

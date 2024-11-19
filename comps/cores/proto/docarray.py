@@ -20,6 +20,10 @@ class TextDoc(BaseDoc, TopologyInfo):
     text: str = None
 
 
+class Audio2text(BaseDoc, TopologyInfo):
+    query: str = None
+
+
 class FactualityDoc(BaseDoc):
     reference: str
     text: str
@@ -71,6 +75,12 @@ MultimodalDoc = Union[
 
 class Base64ByteStrDoc(BaseDoc):
     byte_str: str
+
+
+class DocSumDoc(BaseDoc):
+    text: Optional[str] = None
+    audio: Optional[str] = None
+    video: Optional[str] = None
 
 
 class DocPath(BaseDoc):
@@ -202,6 +212,7 @@ class LLMParamsDoc(BaseDoc):
 
 
 class LLMParams(BaseDoc):
+    model: Optional[str] = None
     max_tokens: int = 1024
     max_new_tokens: int = 1024
     top_k: int = 10
