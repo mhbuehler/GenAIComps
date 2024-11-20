@@ -990,13 +990,13 @@ class MultimodalQnAGateway(Gateway):
             else:
                 response = "The server fail to generate answer to your query!"
         print("RESPONSE IS ", response)
-        print("RESULT DICT IS: ", result_dict)
         if "metadata" in result_dict[last_node].keys():
             # from retrieval results
             metadata = result_dict[last_node]["metadata"]
         else:
             # follow-up question, no retrieval
             metadata = None
+        print("RESULT DICT IS: ", result_dict)
         choices = []
         usage = UsageInfo()
         choices.append(
@@ -1008,7 +1008,7 @@ class MultimodalQnAGateway(Gateway):
             )
         )
         print("CHOICES IS ", choices)
-        return ChatCompletionResponse(model="multimodalqna", choices=choices, usage=usage)
+        return ChatCompletionResponse(model="multimodalqna", choices=choices, usage=usage, history=initial_inputs)
 
 
 class AvatarChatbotGateway(Gateway):
