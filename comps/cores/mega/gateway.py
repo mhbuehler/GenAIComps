@@ -977,6 +977,7 @@ class MultimodalQnAGateway(Gateway):
                 and node == runtime_graph.all_leaves()[-1]
                 and self.megaservice.services[node].service_type == ServiceType.LVM
             ):
+                print("RESPONSE IS ", response)
                 return response
         last_node = runtime_graph.all_leaves()[-1]
 
