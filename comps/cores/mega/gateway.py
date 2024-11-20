@@ -938,10 +938,8 @@ class MultimodalQnAGateway(Gateway):
             cur_megaservice = self.lvm_megaservice
             if "image" in b64_types:
                 initial_inputs = {"prompt": prompt + decoded_audio_input, "image": b64_types["image"][0]}
-            elif decoded_audio_input:
-                initial_inputs = {"text": prompt + decoded_audio_input}
             else:
-                initial_inputs = {"text": prompt}
+                initial_inputs = {"prompt": prompt + decoded_audio_input}
             
 
         elif isinstance(messages, list):
@@ -1007,6 +1005,7 @@ class MultimodalQnAGateway(Gateway):
                 metadata=metadata,
             )
         )
+        print("CHOICES IS ", choices)
         return ChatCompletionResponse(model="multimodalqna", choices=choices, usage=usage)
 
 
