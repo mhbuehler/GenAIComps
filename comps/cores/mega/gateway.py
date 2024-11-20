@@ -977,7 +977,6 @@ class MultimodalQnAGateway(Gateway):
                 and node == runtime_graph.all_leaves()[-1]
                 and self.megaservice.services[node].service_type == ServiceType.LVM
             ):
-                print("RESPONSE IS ", response)
                 return response
         last_node = runtime_graph.all_leaves()[-1]
 
@@ -990,6 +989,7 @@ class MultimodalQnAGateway(Gateway):
                 response = result_dict[last_node]["detail"]
             else:
                 response = "The server fail to generate answer to your query!"
+        print("RESPONSE IS ", response)
         if "metadata" in result_dict[last_node].keys():
             # from retrieval results
             metadata = result_dict[last_node]["metadata"]
