@@ -990,6 +990,7 @@ class MultimodalQnAGateway(Gateway):
             else:
                 response = "The server fail to generate answer to your query!"
         print("RESPONSE IS ", response)
+        print("RESULT DICT IS ", result_dict)
         if "metadata" in result_dict[last_node].keys():
             # from retrieval results
             metadata = result_dict[last_node]["metadata"]
