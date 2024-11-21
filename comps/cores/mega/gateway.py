@@ -945,10 +945,10 @@ class MultimodalQnAGateway(Gateway):
 
             cur_megaservice = self.lvm_megaservice
             if "image" in b64_types:
-                debug = "This is an image query, hence it is a follow up query and is using " + cur_megaservice
+                debug = "This is an image query, hence it is a follow up query and is using LVM"
                 initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
             else:
-                debug = "This is an else statement which I'm not sure is ever true. it would use this service though " + cur_megaservice
+                debug = "This is an else statement which I'm not sure is ever true. it would use this service though LVM"
                 initial_inputs = {"prompt": prompt}     
 
             if "audio" in b64_types:
@@ -958,7 +958,7 @@ class MultimodalQnAGateway(Gateway):
                 if prompt.strip() == decoded_audio_input:
                     # this means the first query is just audio
                     cur_megaservice = self.megaservice
-                    debug = "This is a lone-audio query because it exactly matches the decoded audio input, hence it is a first query and is using " + cur_megaservice
+                    debug = "This is a lone-audio query because it exactly matches the decoded audio input, hence it is a first query and is using Embedding"
                     initial_inputs = {"text": prompt}
 
         else:
@@ -966,11 +966,11 @@ class MultimodalQnAGateway(Gateway):
             if prompt.count('\n') > 1:
                 # there is more than one query, hence it goes to LVM
                 cur_megaservice = self.lvm_megaservice
-                debug = "This is a prompt with multiple appended strings, hence it is a follow up query and is using " + cur_megaservice
+                debug = "This is a prompt with multiple appended strings, hence it is a follow up query and is using LVM"
                 initial_inputs = {"text": prompt}
             else:
                 cur_megaservice = self.megaservice
-                debug = "This is a lone-text query with only one string, hence it is a first query and is using " + cur_megaservice
+                debug = "This is a lone-text query with only one string, hence it is a first query and is using Embedding"
                 initial_inputs = {"text": prompt}
 
         parameters = LLMParams(
