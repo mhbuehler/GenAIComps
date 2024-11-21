@@ -822,12 +822,21 @@ class MultimodalQnAGateway(Gateway):
                         audios = [
                             item["audio"] for item in message["content"] if item["type"] == "audio"
                         ]
-                        if image_list:
-                            messages_dict[msg_role] = (text, image_list)
-                        elif audios:
-                            messages_dict[msg_role] = audios
-                        else:
+                        if audios:
+                            decoded_audio_input = self.convert_audio_to_text(audios)
+                         
+                        if text and not audios and not image_list:
                             messages_dict[msg_role] = text
+                        elif audios and not text and not image_list:
+                            messages_dict[msg_role] = decoded_audio_input
+                        else:
+                            messages_dict[msg_role] = (text, decoded_audio_input, image_list)
+                        # if image_list:
+                        #     messages_dict[msg_role] = (text, image_list)
+                        # elif audios:
+                        #     messages_dict[msg_role] = audios
+                        # else:
+                        #     messages_dict[msg_role] = text
                     else:
                         messages_dict[msg_role] = message["content"]
                     messages_dicts.append(messages_dict)
@@ -842,17 +851,22 @@ class MultimodalQnAGateway(Gateway):
             for messages_dict in messages_dicts:
                 for i, (role, message) in enumerate(messages_dict.items()):
                     if isinstance(message, tuple):
-                        text, image_list = message
+                        text, decoded_audio_input, image_list = message
                         if i == 0:
                             # do not add role for the very first message.
                             # this will be added by llava_server
                             if text:
                                 prompt += text + "\n"
+                            elif decoded_audio_input:
+                                prompt += decoded_audio_input + "\n"
                         else:
                             if text:
                                 prompt += role.upper() + ": " + text + "\n"
+                            elif decoded_audio_input:
+                                prompt += role.upper() + ": " + decoded_audio_input + "\n"
                             else:
                                 prompt += role.upper() + ":"
+
                         if image_list:
                             for img in image_list:
                                 # URL
@@ -886,17 +900,15 @@ class MultimodalQnAGateway(Gateway):
                             else:
                                 prompt += role.upper() + ":" 
 
-                    # else, it is an audio list. No action needed
 
         if images:
             b64_types["image"] = images
         if audios:
-            b64_types["audio"] = audios        
+            b64_types["audio"] = decoded_audio_input        
 
+        print("PROMPT IS: ", prompt)
         if prompt and b64_types: # if the query has multiple types, it is a follow up query. Return all types
             return prompt, b64_types
-        elif audios: # if only audios is present, return audios
-            return audios
         else:
             return prompt
         
@@ -926,27 +938,25 @@ class MultimodalQnAGateway(Gateway):
         chat_request = ChatCompletionRequest.model_validate(data)
         # Multimodal RAG QnA With Videos has not yet accepts image as input during QnA.
         messages = self._handle_message(chat_request.messages)
+        decoded_audio_input = ""
         if isinstance(messages, tuple):
             # print(f"This request include image, thus it is a follow-up query. Using lvm megaservice")
             prompt, b64_types = messages
-            decoded_audio_input = ""
             if "audio" in b64_types:
                 # call ASR endpoint to decode audio to text             
-                decoded_audio_input = self.convert_audio_to_text(b64_types)
-                decoded_audio_input = "USER: " + decoded_audio_input + '\n'
+                decoded_audio_input = b64_types["audio"]
                 # audio will always come from the user
             cur_megaservice = self.lvm_megaservice
             if "image" in b64_types:
-                initial_inputs = {"prompt": prompt + decoded_audio_input, "image": b64_types["image"][0]}
+                initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
             else:
-                initial_inputs = {"prompt": prompt + decoded_audio_input}
-            
+                initial_inputs = {"prompt": prompt}     
 
-        elif isinstance(messages, list):
-            # call ASR endpoint to decode audio to text 
-            cur_megaservice = self.megaservice
-            decoded_audio_input = self.convert_audio_to_text(messages)
-            initial_inputs = {"text": decoded_audio_input}
+        # elif isinstance(messages, list):
+        #     # call ASR endpoint to decode audio to text 
+        #     cur_megaservice = self.megaservice
+        #     decoded_audio_input = self.convert_audio_to_text(messages)
+        #     initial_inputs = {"text": decoded_audio_input}
         else:
             # print(f"This is the first query, requiring multimodal retrieval. Using multimodal rag megaservice")
             cur_megaservice = self.megaservice
@@ -964,6 +974,8 @@ class MultimodalQnAGateway(Gateway):
             streaming=stream_opt,
             chat_template=chat_request.chat_template if chat_request.chat_template else None,
         )
+
+        print("Initial Inputs is: ", initial_inputs)
         result_dict, runtime_graph = await cur_megaservice.schedule(
             initial_inputs=initial_inputs, llm_parameters=parameters
         )
@@ -992,11 +1004,17 @@ class MultimodalQnAGateway(Gateway):
         print("RESPONSE IS ", response)
         if "metadata" in result_dict[last_node].keys():
             # from retrieval results
-            metadata = result_dict[last_node]["metadata"]
+            if decoded_audio_input:
+                metadata = decoded_audio_input
+            else:
+                metadata = result_dict[last_node]["metadata"]
         else:
             # follow-up question, no retrieval
-            metadata = None
-        print("RESULT DICT IS: ", result_dict)
+            if decoded_audio_input:
+                metadata = decoded_audio_input
+            else:
+                metadata = None
+        print("Metadata is: ", metadata)
         choices = []
         usage = UsageInfo()
         choices.append(
@@ -1008,7 +1026,7 @@ class MultimodalQnAGateway(Gateway):
             )
         )
         print("CHOICES IS ", choices)
-        return ChatCompletionResponse(model="multimodalqna", choices=choices, usage=usage, history=initial_inputs)
+        return ChatCompletionResponse(model="multimodalqna", choices=choices, usage=usage)
 
 
 class AvatarChatbotGateway(Gateway):
