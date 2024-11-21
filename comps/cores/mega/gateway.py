@@ -800,6 +800,7 @@ class MultimodalQnAGateway(Gateway):
         audios = []
         b64_types = {}
         messages_dicts = []
+        decoded_audio_input = ""
         if isinstance(messages, str):
             prompt = messages
         else:
