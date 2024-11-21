@@ -831,6 +831,7 @@ class MultimodalQnAGateway(Gateway):
                             messages_dict[msg_role] = decoded_audio_input
                         else:
                             messages_dict[msg_role] = (text, decoded_audio_input, image_list)
+                            b64_types["audio"] = decoded_audio_input 
                         # if image_list:
                         #     messages_dict[msg_role] = (text, image_list)
                         # elif audios:
@@ -902,9 +903,7 @@ class MultimodalQnAGateway(Gateway):
 
 
         if images:
-            b64_types["image"] = images
-        if audios:
-            b64_types["audio"] = decoded_audio_input        
+            b64_types["image"] = images  
 
         print("PROMPT IS: ", prompt)
         if prompt and b64_types: # if the query has multiple types, it is a follow up query. Return all types
