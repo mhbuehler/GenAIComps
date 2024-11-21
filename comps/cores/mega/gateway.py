@@ -1004,13 +1004,13 @@ class MultimodalQnAGateway(Gateway):
         if "metadata" in result_dict[last_node].keys():
             # from retrieval results
             if decoded_audio_input:
-                metadata = decoded_audio_input
+                metadata = {"audio": decoded_audio_input}
             else:
                 metadata = result_dict[last_node]["metadata"]
         else:
             # follow-up question, no retrieval
             if decoded_audio_input:
-                metadata = decoded_audio_input
+                metadata = {"audio": decoded_audio_input}
             else:
                 metadata = None
         print("Metadata is: ", metadata)
