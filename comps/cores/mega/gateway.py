@@ -955,7 +955,6 @@ class MultimodalQnAGateway(Gateway):
                 if prompt.strip() == decoded_audio_input:
                     # this means the first query is just audio
                     cur_megaservice = self.megaservice
-                    prompt = messages
                     initial_inputs = {"text": prompt}
 
         else:
