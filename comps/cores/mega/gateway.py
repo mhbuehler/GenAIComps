@@ -893,7 +893,7 @@ class MultimodalQnAGateway(Gateway):
                             # do not add role for the very first message.
                             # this will be added by llava_server
                             if message:
-                                prompt += role.upper() + ": " + message + "\n"
+                                prompt += message + "\n"
                         else:
                             if message:
                                 prompt += role.upper() + ": " + message + "\n"
