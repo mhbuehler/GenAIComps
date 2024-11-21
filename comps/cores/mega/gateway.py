@@ -962,9 +962,11 @@ class MultimodalQnAGateway(Gateway):
             if prompt.count('\n') > 1:
                 # there is more than one query, hence it goes to LVM
                 cur_megaservice = self.lvm_megaservice
-                initial_inputs = {"prompt": prompt}
+                print("lvm with text instead of prompt")
+                initial_inputs = {"text": prompt}
             else:
                 cur_megaservice = self.megaservice
+                print("NON lvm with text")
                 initial_inputs = {"text": prompt}
 
         parameters = LLMParams(
