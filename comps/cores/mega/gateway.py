@@ -939,13 +939,16 @@ class MultimodalQnAGateway(Gateway):
         # Multimodal RAG QnA With Videos has not yet accepts image as input during QnA.
         messages = self._handle_message(chat_request.messages)
         decoded_audio_input = ""
+        debug = ""
         if isinstance(messages, tuple):
             prompt, b64_types = messages
 
             cur_megaservice = self.lvm_megaservice
             if "image" in b64_types:
+                debug = "This is an image query, hence it is a follow up query and is using " + cur_megaservice
                 initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
             else:
+                debug = "This is an else statement which I'm not sure is ever true. it would use this service though " + cur_megaservice
                 initial_inputs = {"prompt": prompt}     
 
             if "audio" in b64_types:
@@ -955,6 +958,7 @@ class MultimodalQnAGateway(Gateway):
                 if prompt.strip() == decoded_audio_input:
                     # this means the first query is just audio
                     cur_megaservice = self.megaservice
+                    debug = "This is a lone-audio query because it exactly matches the decoded audio input, hence it is a first query and is using " + cur_megaservice
                     initial_inputs = {"text": prompt}
 
         else:
@@ -962,11 +966,11 @@ class MultimodalQnAGateway(Gateway):
             if prompt.count('\n') > 1:
                 # there is more than one query, hence it goes to LVM
                 cur_megaservice = self.lvm_megaservice
-                print("lvm with text instead of prompt")
+                debug = "This is a prompt with multiple appended strings, hence it is a follow up query and is using " + cur_megaservice
                 initial_inputs = {"text": prompt}
             else:
                 cur_megaservice = self.megaservice
-                print("NON lvm with text")
+                debug = "This is a lone-text query with only one string, hence it is a first query and is using " + cur_megaservice
                 initial_inputs = {"text": prompt}
 
         parameters = LLMParams(
@@ -981,6 +985,7 @@ class MultimodalQnAGateway(Gateway):
             chat_template=chat_request.chat_template if chat_request.chat_template else None,
         )
 
+        print(debug)
         print("Initial Inputs is: ", initial_inputs)
         result_dict, runtime_graph = await cur_megaservice.schedule(
             initial_inputs=initial_inputs, llm_parameters=parameters
@@ -1006,8 +1011,7 @@ class MultimodalQnAGateway(Gateway):
             if "detail" in result_dict[last_node].keys():
                 response = result_dict[last_node]["detail"]
             else:
-                response = "The server fail to generate answer to your query!"
-        print("RESPONSE IS ", response)
+                response = "The server failed to generate an answer to your query!"
         if "metadata" in result_dict[last_node].keys():
             # from retrieval results
             if decoded_audio_input:
@@ -1021,6 +1025,7 @@ class MultimodalQnAGateway(Gateway):
             else:
                 metadata = None
         print("Metadata is: ", metadata)
+        print("RESPONSE IS ", response)
         choices = []
         usage = UsageInfo()
         choices.append(
