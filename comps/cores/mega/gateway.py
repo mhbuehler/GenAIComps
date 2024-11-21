@@ -825,6 +825,7 @@ class MultimodalQnAGateway(Gateway):
                         ]
                         if audios:
                             decoded_audio_input = self.convert_audio_to_text(audios)
+                            b64_types["audio"] = decoded_audio_input 
                          
                         if text and not audios and not image_list:
                             messages_dict[msg_role] = text
@@ -832,7 +833,6 @@ class MultimodalQnAGateway(Gateway):
                             messages_dict[msg_role] = decoded_audio_input
                         else:
                             messages_dict[msg_role] = (text, decoded_audio_input, image_list)
-                            b64_types["audio"] = decoded_audio_input 
                         # if image_list:
                         #     messages_dict[msg_role] = (text, image_list)
                         # elif audios:
@@ -940,28 +940,33 @@ class MultimodalQnAGateway(Gateway):
         messages = self._handle_message(chat_request.messages)
         decoded_audio_input = ""
         if isinstance(messages, tuple):
-            # print(f"This request include image, thus it is a follow-up query. Using lvm megaservice")
             prompt, b64_types = messages
-            if "audio" in b64_types:
-                # call ASR endpoint to decode audio to text             
-                decoded_audio_input = b64_types["audio"]
-                # audio will always come from the user
+
             cur_megaservice = self.lvm_megaservice
             if "image" in b64_types:
                 initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
             else:
                 initial_inputs = {"prompt": prompt}     
 
-        # elif isinstance(messages, list):
-        #     # call ASR endpoint to decode audio to text 
-        #     cur_megaservice = self.megaservice
-        #     decoded_audio_input = self.convert_audio_to_text(messages)
-        #     initial_inputs = {"text": decoded_audio_input}
+            if "audio" in b64_types:
+                # call ASR endpoint to decode audio to text             
+                decoded_audio_input = b64_types["audio"]
+                # check if it is a first query
+                if prompt.strip() == decoded_audio_input:
+                    # this means the first query is just audio
+                    cur_megaservice = self.megaservice
+                    prompt = messages
+                    initial_inputs = {"text": prompt}
+
         else:
-            # print(f"This is the first query, requiring multimodal retrieval. Using multimodal rag megaservice")
-            cur_megaservice = self.megaservice
             prompt = messages
-            initial_inputs = {"text": prompt}
+            if prompt.count('\n') > 1:
+                # there is more than one query, hence it goes to LVM
+                cur_megaservice = self.lvm_megaservice
+                initial_inputs = {"prompt": prompt}
+            else:
+                cur_megaservice = self.megaservice
+                initial_inputs = {"text": prompt}
 
         parameters = LLMParams(
             max_new_tokens=chat_request.max_tokens if chat_request.max_tokens else 1024,
