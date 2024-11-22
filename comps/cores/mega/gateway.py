@@ -850,8 +850,8 @@ class MultimodalQnAGateway(Gateway):
 
     def _get_role_labels(self):
         """
-        Returns a dictionar of role labels that are used in the chat prompt based on the LVM_MODEL_ID
-        environment variable. The function defines the role labels used by the llava-1.5, lava-v1.6-vicuna,
+        Returns a dictionary of role labels that are used in the chat prompt based on the LVM_MODEL_ID
+        environment variable. The function defines the role labels used by the llava-1.5, llava-v1.6-vicuna,
         llava-v1.6-mistral, and llava-interleave models, and then defaults to use "USER:" and "ASSISTANT:" if the
         LVM_MODEL_ID is not one of those.
         """
