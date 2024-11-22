@@ -825,7 +825,7 @@ class MultimodalQnAGateway(Gateway):
                             item["audio"] for item in message["content"] if item["type"] == "audio"
                         ]
                         if audios:
-                            # translate audio to text
+                            # translate audio to text. From this point forward, audio is treated like text
                             decoded_audio_input = self.convert_audio_to_text(audios)
                             b64_types["audio"] = decoded_audio_input 
                          
@@ -903,8 +903,8 @@ class MultimodalQnAGateway(Gateway):
         if images:
             b64_types["image"] = images  
 
-        print("PROMPT IS: ", prompt)
-        if prompt and b64_types: # if the query has multiple types, it is a follow up query. Return all types
+         # If the query has multiple media types, return all types
+        if prompt and b64_types:
             return prompt, b64_types
         else:
             return prompt
@@ -936,7 +936,6 @@ class MultimodalQnAGateway(Gateway):
         # Multimodal RAG QnA With Videos has not yet accepts image as input during QnA.
         messages = self._handle_message(chat_request.messages)
         decoded_audio_input = ""
-        debug = ""
         if isinstance(messages, tuple):
             prompt, b64_types = messages
             if "audio" in b64_types:
@@ -944,18 +943,18 @@ class MultimodalQnAGateway(Gateway):
                 decoded_audio_input = b64_types["audio"]
 
             if "image" in b64_types:
-                debug = "This is an image query, hence it is a follow up query and is using LVM"
+                # This is an image query, hence it is a follow up query and is using LVM
                 cur_megaservice = self.lvm_megaservice
                 initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
             else:    
+                # This query includes only text, translated audio, or both, hence it will use Embedding
                 cur_megaservice = self.megaservice
-                debug = "This query includes only text, translated audio, or both, hence it will use Embedding"
                 initial_inputs = {"text": prompt}
 
         else:
+            # This is a query with only text, hence it is a first query and is using Embedding
             prompt = messages
             cur_megaservice = self.megaservice
-            debug = "This is a query with only text, hence it is a first query and is using Embedding"
             initial_inputs = {"text": prompt}
 
         parameters = LLMParams(
@@ -970,8 +969,6 @@ class MultimodalQnAGateway(Gateway):
             chat_template=chat_request.chat_template if chat_request.chat_template else None,
         )
 
-        print(debug)
-        print("Initial Inputs is: ", initial_inputs)
         result_dict, runtime_graph = await cur_megaservice.schedule(
             initial_inputs=initial_inputs, llm_parameters=parameters
         )
@@ -1009,8 +1006,7 @@ class MultimodalQnAGateway(Gateway):
                 metadata = {"audio": decoded_audio_input}
             else:
                 metadata = None
-        print("Metadata is: ", metadata)
-        print("RESPONSE IS ", response)
+
         choices = []
         usage = UsageInfo()
         choices.append(
@@ -1021,7 +1017,6 @@ class MultimodalQnAGateway(Gateway):
                 metadata=metadata,
             )
         )
-        print("CHOICES IS ", choices)
         return ChatCompletionResponse(model="multimodalqna", choices=choices, usage=usage)
 
 
