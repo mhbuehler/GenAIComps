@@ -1052,10 +1052,9 @@ class MultimodalQnAGateway(Gateway):
                 response = "The server failed to generate an answer to your query!"
         if "metadata" in result_dict[last_node].keys():
             # from retrieval results
+            metadata = result_dict[last_node]["metadata"]
             if decoded_audio_input:
-                metadata["audio"] =  decoded_audio_input
-            else:
-                metadata = result_dict[last_node]["metadata"]
+                metadata["audio"] =  decoded_audio_input    
         else:
             # follow-up question, no retrieval
             if decoded_audio_input:
