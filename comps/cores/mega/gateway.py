@@ -878,16 +878,13 @@ class MultimodalQnAGateway(Gateway):
     def _handle_message(self, messages):
         images = []
         messages_dicts = []
-
         if isinstance(messages, str):
             prompt = messages
         else:
             messages_dict = {}
-            num_messages = len(messages)
             system_prompt = ""
             prompt = ""
             role_label_dict = self._get_role_labels()
-
             for message in messages:
                 msg_role = message["role"]
                 messages_dict = {}
@@ -920,8 +917,8 @@ class MultimodalQnAGateway(Gateway):
                 for i, (role, message) in enumerate(messages_dict.items()):
                     if isinstance(message, tuple):
                         text, image_list = message
-                        # Add image indictors within the conversation for sequences with more than one message
-                        image_tags = "<image>\n" * len(image_list) if num_messages > 1 else ""
+                        # Add image indicators within the conversation
+                        image_tags = "<image>\n" * len(image_list)
                         if i == 0:
                             # do not add role for the very first message.
                             # this will be added by llava_server
@@ -981,9 +978,14 @@ class MultimodalQnAGateway(Gateway):
             initial_inputs = {"prompt": prompt, "image": images}
         else:
             # print(f"This is the first query, requiring multimodal retrieval. Using multimodal rag megaservice")
+            if images and len(images) > 0:
+                # Formatting as a TextImageDoc
+                initial_inputs = {"text": {"text": prompt}, "image": {"base64_image": images[0]}}
+            else:
+                # Formatting as a TextDoc
+                initial_inputs = {"text": prompt}
+
             cur_megaservice = self.megaservice
-            initial_inputs = {"text": prompt}
-            initial_inputs["image"]: images
 
         parameters = LLMParams(
             max_new_tokens=chat_request.max_tokens if chat_request.max_tokens else 1024,

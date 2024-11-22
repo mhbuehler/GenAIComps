@@ -134,6 +134,7 @@ async def generate(request: Request) -> Response:  # FIXME batch_size=1 for now
     model_name = generator.model.name_or_path
     user_label = "USER:"
     assistant_label = "ASSISTANT:"
+    image_tag = "<image>\n"
 
     # This is the role label that we see in the results from the pipeline. This is used to split the output.
     output_assistant_label = "ASSISTANT: "
@@ -158,8 +159,10 @@ async def generate(request: Request) -> Response:  # FIXME batch_size=1 for now
             image = process_image(image)
             images.append(image)
 
-        # If the prompt provided does not already have <image> tags, format the prompt with images
-        image_tags = "<image>\n" * len(images) if "<image>" not in prompt else ""
+        # If the prompt provided does not have all the image tags, format the prompt with images
+        num_images = len(images)
+        num_image_tags = prompt.count(image_tag)
+        image_tags = image_tag * (num_images - num_image_tags) if num_images > num_image_tags else ""
         prompt = f"{user_label}{image_tags} {prompt}{assistant_label} "
     else:
         images = None
