@@ -866,10 +866,10 @@ class MultimodalQnAGateway(Gateway):
         if "llava-interleave" in lvm_model:
             role_labels["user"] = "<|im_start|>user"
             role_labels["assistant"] = "<|im_end|><|im_start|>assistant"
-        elif "llava-v1.6-mistral" in model_name:
+        elif "llava-v1.6-mistral" in lvm_model:
             role_labels["user"] = "[INST]"
             role_labels["assistant"] = " [/INST]"
-        elif "llava-1.5" not in model_name and "llava-v1.6-vicuna" not in model_name:
+        elif "llava-1.5" not in lvm_model and "llava-v1.6-vicuna" not in lvm_model:
             print(f"[ MultimodalQnAGateway ] Using default role labels for prompt formatting: {role_labels}")
 
         return role_labels
