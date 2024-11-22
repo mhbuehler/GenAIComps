@@ -814,6 +814,7 @@ class MultimodalQnAGateway(Gateway):
                     system_prompt = message["content"]
                 elif msg_role == "user":
                     if type(message["content"]) == list:
+                         # separate each media type and store accordingly
                         text = ""
                         text_list = [item["text"] for item in message["content"] if item["type"] == "text"]
                         text += "\n".join(text_list)
@@ -824,6 +825,7 @@ class MultimodalQnAGateway(Gateway):
                             item["audio"] for item in message["content"] if item["type"] == "audio"
                         ]
                         if audios:
+                            # translate audio to text
                             decoded_audio_input = self.convert_audio_to_text(audios)
                             b64_types["audio"] = decoded_audio_input 
                          
@@ -833,12 +835,7 @@ class MultimodalQnAGateway(Gateway):
                             messages_dict[msg_role] = decoded_audio_input
                         else:
                             messages_dict[msg_role] = (text, decoded_audio_input, image_list)
-                        # if image_list:
-                        #     messages_dict[msg_role] = (text, image_list)
-                        # elif audios:
-                        #     messages_dict[msg_role] = audios
-                        # else:
-                        #     messages_dict[msg_role] = text
+
                     else:
                         messages_dict[msg_role] = message["content"]
                     messages_dicts.append(messages_dict)
@@ -913,6 +910,7 @@ class MultimodalQnAGateway(Gateway):
             return prompt
         
     def convert_audio_to_text(self, audio):
+        # translate audio to text by passing in dictionary to ASR
         if isinstance(audio, dict):
             input_dict = {"byte_str": audio["audio"][0]}
         else:
@@ -925,7 +923,6 @@ class MultimodalQnAGateway(Gateway):
                 response.text)})
 
         response = response.json()
-        # The rest of the code should be treated the same as text input
         return response["query"]
 
 
@@ -942,36 +939,24 @@ class MultimodalQnAGateway(Gateway):
         debug = ""
         if isinstance(messages, tuple):
             prompt, b64_types = messages
+            if "audio" in b64_types:
+                # Audio querys will always come in as a tuple in order to keep track of translation for metadata            
+                decoded_audio_input = b64_types["audio"]
 
-            cur_megaservice = self.lvm_megaservice
             if "image" in b64_types:
                 debug = "This is an image query, hence it is a follow up query and is using LVM"
+                cur_megaservice = self.lvm_megaservice
                 initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
-            else:
-                debug = "This is an else statement which I'm not sure is ever true. it would use this service though LVM"
-                initial_inputs = {"prompt": prompt}     
-
-            if "audio" in b64_types:
-                # call ASR endpoint to decode audio to text             
-                decoded_audio_input = b64_types["audio"]
-                # check if it is a first query
-                if prompt.strip() == decoded_audio_input:
-                    # this means the first query is just audio
-                    cur_megaservice = self.megaservice
-                    debug = "This is a lone-audio query because it exactly matches the decoded audio input, hence it is a first query and is using Embedding"
-                    initial_inputs = {"text": prompt}
+            else:    
+                cur_megaservice = self.megaservice
+                debug = "This query includes only text, translated audio, or both, hence it will use Embedding"
+                initial_inputs = {"text": prompt}
 
         else:
             prompt = messages
-            if prompt.count('\n') > 1:
-                # there is more than one query, hence it goes to LVM
-                cur_megaservice = self.lvm_megaservice
-                debug = "This is a prompt with multiple appended strings, hence it is a follow up query and is using LVM"
-                initial_inputs = {"text": prompt}
-            else:
-                cur_megaservice = self.megaservice
-                debug = "This is a lone-text query with only one string, hence it is a first query and is using Embedding"
-                initial_inputs = {"text": prompt}
+            cur_megaservice = self.megaservice
+            debug = "This is a query with only text, hence it is a first query and is using Embedding"
+            initial_inputs = {"text": prompt}
 
         parameters = LLMParams(
             max_new_tokens=chat_request.max_tokens if chat_request.max_tokens else 1024,
@@ -1006,7 +991,7 @@ class MultimodalQnAGateway(Gateway):
         if "text" in result_dict[last_node].keys():
             response = result_dict[last_node]["text"]
         else:
-            # text in not response message
+            # text is not in response message
             # something wrong, for example due to empty retrieval results
             if "detail" in result_dict[last_node].keys():
                 response = result_dict[last_node]["detail"]
