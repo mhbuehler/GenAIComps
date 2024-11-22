@@ -848,6 +848,32 @@ class MultimodalQnAGateway(Gateway):
             ChatCompletionResponse,
         )
 
+    def _get_role_labels(self):
+        """
+        Returns a dictionary of role labels that are used in the chat prompt based on the LVM_MODEL_ID
+        environment variable. The function defines the role labels used by the llava-1.5, llava-v1.6-vicuna,
+        llava-v1.6-mistral, and llava-interleave models, and then defaults to use "USER:" and "ASSISTANT:" if the
+        LVM_MODEL_ID is not one of those.
+        """
+        lvm_model = os.getenv("LVM_MODEL_ID", "")
+
+        # Default to labels used by llava-1.5 and llava-v1.6-vicuna models
+        role_labels = {
+            "user": "USER:",
+            "assistant": "ASSISTANT:"
+        }
+
+        if "llava-interleave" in lvm_model:
+            role_labels["user"] = "<|im_start|>user"
+            role_labels["assistant"] = "<|im_end|><|im_start|>assistant"
+        elif "llava-v1.6-mistral" in model_name:
+            role_labels["user"] = "[INST]"
+            role_labels["assistant"] = " [/INST]"
+        elif "llava-1.5" not in model_name and "llava-v1.6-vicuna" not in model_name:
+            print(f"[ MultimodalQnAGateway ] Using default role labels for prompt formatting: {role_labels}")
+
+        return role_labels
+
     # this overrides _handle_message method of Gateway
     def _handle_message(self, messages):
         images = []
@@ -858,6 +884,7 @@ class MultimodalQnAGateway(Gateway):
             messages_dict = {}
             system_prompt = ""
             prompt = ""
+            role_label_dict = self._get_role_labels()
             for message in messages:
                 msg_role = message["role"]
                 messages_dict = {}
@@ -890,16 +917,18 @@ class MultimodalQnAGateway(Gateway):
                 for i, (role, message) in enumerate(messages_dict.items()):
                     if isinstance(message, tuple):
                         text, image_list = message
+                        # Add image indicators within the conversation
+                        image_tags = "<image>\n" * len(image_list)
                         if i == 0:
                             # do not add role for the very first message.
                             # this will be added by llava_server
                             if text:
-                                prompt += text + "\n"
+                                prompt += image_tags + text + "\n"
                         else:
                             if text:
-                                prompt += role.upper() + ": " + text + "\n"
+                                prompt += role_label_dict[role] + image_tags + " " + text + "\n"
                             else:
-                                prompt += role.upper() + ":"
+                                prompt += role_label_dict[role] + image_tags
                         for img in image_list:
                             # URL
                             if img.startswith("http://") or img.startswith("https://"):
@@ -924,16 +953,13 @@ class MultimodalQnAGateway(Gateway):
                             # do not add role for the very first message.
                             # this will be added by llava_server
                             if message:
-                                prompt += role.upper() + ": " + message + "\n"
+                                prompt += message + "\n"
                         else:
                             if message:
-                                prompt += role.upper() + ": " + message + "\n"
+                                prompt += role_label_dict[role] + " " + message + "\n"
                             else:
-                                prompt += role.upper() + ":"
-        if images:
-            return prompt, images
-        else:
-            return prompt
+                                prompt += role_label_dict[role]
+        return prompt, images
 
     async def handle_request(self, request: Request):
         data = await request.json()
@@ -942,18 +968,24 @@ class MultimodalQnAGateway(Gateway):
             print("[ MultimodalQnAGateway ] stream=True not used, this has not support streaming yet!")
             stream_opt = False
         chat_request = ChatCompletionRequest.model_validate(data)
+        num_messages = len(data["messages"]) if isinstance(data["messages"], list) else 1
+
         # Multimodal RAG QnA With Videos has not yet accepts image as input during QnA.
-        prompt_and_image = self._handle_message(chat_request.messages)
-        if isinstance(prompt_and_image, tuple):
+        prompt, images = self._handle_message(chat_request.messages)
+        if num_messages > 1:
             # print(f"This request include image, thus it is a follow-up query. Using lvm megaservice")
-            prompt, images = prompt_and_image
             cur_megaservice = self.lvm_megaservice
-            initial_inputs = {"prompt": prompt, "image": images[0]}
+            initial_inputs = {"prompt": prompt, "image": images}
         else:
             # print(f"This is the first query, requiring multimodal retrieval. Using multimodal rag megaservice")
-            prompt = prompt_and_image
+            if images and len(images) > 0:
+                # Formatting as a TextImageDoc
+                initial_inputs = {"text": {"text": prompt}, "image": {"base64_image": images[0]}}
+            else:
+                # Formatting as a TextDoc
+                initial_inputs = {"text": prompt}
+
             cur_megaservice = self.megaservice
-            initial_inputs = {"text": prompt}
 
         parameters = LLMParams(
             max_new_tokens=chat_request.max_tokens if chat_request.max_tokens else 1024,
