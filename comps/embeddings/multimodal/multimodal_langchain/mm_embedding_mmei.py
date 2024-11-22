@@ -43,20 +43,20 @@ def embedding(input: MultimodalDoc) -> EmbedDoc:
     if logflag:
         logger.info(input)
 
-    json_input = {}
+    json = {}
     if isinstance(input, TextDoc):
-        json_input["text"] = input.text
+        json["text"] = input.text
     elif isinstance(input, TextImageDoc):
-        json_input["text"] = input.text.text
+        json["text"] = input.text.text
         img_bytes = input.image.url.load_bytes()
         base64_img = base64.b64encode(img_bytes).decode("utf-8")
-        json_input["img_b64_str"] = base64_img
+        json["img_b64_str"] = base64_img
     else:
         return JSONResponse(status_code=400, content={"message": "Bad request!"})
 
     # call multimodal embedding endpoint
     try:
-        response = requests.post(mmei_embedding_endpoint, headers=headers, json=json_input)
+        response = requests.post(mmei_embedding_endpoint, headers=headers, json=json)
         if response.status_code != 200:
             return JSONResponse(status_code=503, content={"message": "Multimodal embedding endpoint failed!"})
 

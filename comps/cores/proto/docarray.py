@@ -73,6 +73,7 @@ MultimodalDoc = Union[
     TextImageDoc,
 ]
 
+
 class Base64ByteStrDoc(BaseDoc):
     byte_str: str
 
