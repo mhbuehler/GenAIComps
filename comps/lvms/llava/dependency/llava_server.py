@@ -155,19 +155,20 @@ async def generate(request: Request) -> Response:  # FIXME batch_size=1 for now
         # Decode and Resize the images
         images = []
         for img_b64 in img_b64_str:
-            image = PIL.Image.open(BytesIO(base64.b64decode(img_b64)))
-            image = process_image(image)
-            images.append(image)
+            if img_b64:
+                image = PIL.Image.open(BytesIO(base64.b64decode(img_b64)))
+                image = process_image(image)
+                images.append(image)
 
         # If the prompt provided does not have all the image tags, format the prompt with images
         num_images = len(images)
         num_image_tags = prompt.count(image_tag)
         image_tags = image_tag * (num_images - num_image_tags) if num_images > num_image_tags else ""
-        prompt = f"{user_label}{image_tags} {prompt}{assistant_label} "
+        prompt = f"{user_label}{image_tags} {prompt}{assistant_label}"
     else:
         images = None
         # format the prompt with text only
-        prompt = f"{user_label} {prompt}\n{assistant_label} "
+        prompt = f"{user_label} {prompt}\n{assistant_label}"
 
     if args.device == "hpu":
         generate_kwargs = {
