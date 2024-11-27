@@ -17,6 +17,7 @@ from langchain_core.embeddings import Embeddings
 from langchain_core.utils import get_from_dict_or_env
 from multimodal_utils import (
     clear_upload_folder,
+    convert_img_to_base64,
     convert_video_to_audio,
     create_upload_folder,
     delete_audio_file,
@@ -30,6 +31,7 @@ from multimodal_utils import (
     write_vtt,
 )
 from PIL import Image
+import pymupdf
 
 from comps import opea_microservices, register_microservice
 from comps.embeddings.multimodal.bridgetower.bridgetower_embedding import BridgeTowerEmbedding
@@ -510,7 +512,7 @@ async def ingest_generate_caption(files: List[UploadFile] = File(None)):
 )
 async def ingest_with_text(files: List[UploadFile] = File(None)):
     if files:
-        accepted_media_formats = [".mp4", ".png", ".jpg", ".jpeg", ".gif"]
+        accepted_media_formats = [".mp4", ".png", ".jpg", ".jpeg", ".gif", ".pdf"]
         # Create a lookup dictionary containing all media files
         matched_files = {f.filename: [f] for f in files if os.path.splitext(f.filename)[1] in accepted_media_formats}
         uploaded_files_map = {}
@@ -537,25 +539,25 @@ async def ingest_with_text(files: List[UploadFile] = File(None)):
             elif file_extension not in accepted_media_formats:
                 print(f"Skipping file {file.filename} because of unsupported format.")
 
-        # Check if every media file has a caption file
-        for media_file_name, file_pair in matched_files.items():
-            if len(file_pair) != 2:
+        # Check that every media file that is not a pdf has a caption file
+        for media_file_name, file_list in matched_files.items():
+            if len(file_list) != 2 and os.path.splitext(media_file_name)[1] != ".pdf":
                 raise HTTPException(status_code=400, detail=f"No caption file found for {media_file_name}")
 
         if len(matched_files.keys()) == 0:
             return HTTPException(
                 status_code=400,
-                detail="The uploaded files have unsupported formats. Please upload at least one video file (.mp4) with captions (.vtt) or one image (.png, .jpg, .jpeg, or .gif) with caption (.txt)",
+                detail="The uploaded files have unsupported formats. Please upload at least one video file (.mp4) with captions (.vtt) or one image (.png, .jpg, .jpeg, or .gif) with caption (.txt) or one .pdf file",
             )
 
         for media_file in matched_files:
             print(f"Processing file {media_file}")
+            file_name, file_extension = os.path.splitext(media_file)
 
             # Assign unique identifier to file
             file_id = generate_id()
 
             # Create file name by appending identifier
-            file_name, file_extension = os.path.splitext(media_file)
             media_file_name = f"{file_name}_{file_id}{file_extension}"
             media_dir_name = os.path.splitext(media_file_name)[0]
 
@@ -564,28 +566,65 @@ async def ingest_with_text(files: List[UploadFile] = File(None)):
                 shutil.copyfileobj(matched_files[media_file][0].file, f)
             uploaded_files_map[file_name] = media_file_name
 
-            # Save caption file in upload directory
-            caption_file_extension = os.path.splitext(matched_files[media_file][1].filename)[1]
-            caption_file = f"{media_dir_name}{caption_file_extension}"
-            with open(os.path.join(upload_folder, caption_file), "wb") as f:
-                shutil.copyfileobj(matched_files[media_file][1].file, f)
+            if file_extension == ".pdf":
+                import cv2
+                # Set up location to store frames and annotations
+                output_dir = os.path.join(upload_folder, media_dir_name)
+                os.makedirs(output_dir, exist_ok=True)
+                os.makedirs(os.path.join(output_dir, "frames"), exist_ok=True)
+                doc = pymupdf.open(os.path.join(upload_folder, media_file_name))
+                annotations = []
+                for page in doc:
+                    text = page.get_text()
+                    blocks = page.get_text("dict")["blocks"]
+                    imgblocks = [b for b in blocks if b["type"] == 1]
+                    for idx, image in enumerate(imgblocks):
+                        # Write image and caption file for each image found in pdf
+                        img_fname = f"frame_{idx}"
+                        img_fpath = os.path.join(output_dir, "frames", img_fname + ".png")
+                        cv2.imwrite(img_fpath, imgblocks[0]['image'])
 
-            # Store frames and caption annotations in a new directory
-            extract_frames_and_annotations_from_transcripts(
-                file_id,
-                os.path.join(upload_folder, media_file_name),
-                os.path.join(upload_folder, caption_file),
-                os.path.join(upload_folder, media_dir_name),
-            )
+                        # Convert image to base64 encoded string
+                        b64_img_str = convert_img_to_base64(frame)
 
-            # Delete temporary caption file
-            os.remove(os.path.join(upload_folder, caption_file))
+                        # Create annotations for frame from transcripts
+                        annotations.append(
+                            {
+                                "video_id": file_id,
+                                "video_name": os.path.basename(os.path.join(upload_folder, media_file_name)),
+                                "b64_img_str": b64_img_str,
+                                "caption": text,
+                                "time": 0.0,
+                                "frame_no": 0,
+                                "sub_video_id": idx,
+                            }
+                        )
 
-            # Ingest multimodal data into redis
-            ingest_multimodal(file_name, os.path.join(upload_folder, media_dir_name), embeddings)
+                with open(os.path.join(output_dir, "annotations.json"), "w") as f:
+                    json.dump(annotations, f)
+            else:
+                # Save caption file in upload directory
+                caption_file_extension = os.path.splitext(matched_files[media_file][1].filename)[1]
+                caption_file = f"{media_dir_name}{caption_file_extension}"
+                with open(os.path.join(upload_folder, caption_file), "wb") as f:
+                    shutil.copyfileobj(matched_files[media_file][1].file, f)
 
-            # Delete temporary media directory containing frames and annotations
-            shutil.rmtree(os.path.join(upload_folder, media_dir_name))
+                # Store frames and caption annotations in a new directory
+                extract_frames_and_annotations_from_transcripts(
+                    file_id,
+                    os.path.join(upload_folder, media_file_name),
+                    os.path.join(upload_folder, caption_file),
+                    os.path.join(upload_folder, media_dir_name),
+                )
+
+                # Delete temporary caption file
+                os.remove(os.path.join(upload_folder, caption_file))
+
+                # Ingest multimodal data into redis
+                ingest_multimodal(file_name, os.path.join(upload_folder, media_dir_name), embeddings)
+
+                # Delete temporary media directory containing frames and annotations
+                shutil.rmtree(os.path.join(upload_folder, media_dir_name))
 
             print(f"Processed file {media_file}")
 
