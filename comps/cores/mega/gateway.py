@@ -1007,10 +1007,10 @@ class MultimodalQnAGateway(Gateway):
                 if "image" in b64_types:
                     initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
                 else:
-                    initial_inputs = {"prompt": prompt, "image": []}
+                    initial_inputs = {"prompt": prompt, "image": ""}
             else:
                 prompt = messages
-                initial_inputs = {"prompt": prompt, "image": []}
+                initial_inputs = {"prompt": prompt, "image": ""}
         else:
             # This is the first query. Ignore image input
             cur_megaservice = self.megaservice
