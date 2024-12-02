@@ -870,7 +870,7 @@ class MultimodalQnAGateway(Gateway):
                     system_prompt = message["content"]
                 elif msg_role == "user":
                     if type(message["content"]) == list:
-                         # separate each media type and store accordingly
+                        # separate each media type and store accordingly
                         text = ""
                         text_list = [item["text"] for item in message["content"] if item["type"] == "text"]
                         text += "\n".join(text_list)
@@ -981,7 +981,6 @@ class MultimodalQnAGateway(Gateway):
         response = response.json()
         return response["query"]
 
-
     async def handle_request(self, request: Request):
         data = await request.json()
         stream_opt = bool(data.get("stream", False))
@@ -1032,7 +1031,6 @@ class MultimodalQnAGateway(Gateway):
             streaming=stream_opt,
             chat_template=chat_request.chat_template if chat_request.chat_template else None,
         )
-
         result_dict, runtime_graph = await cur_megaservice.schedule(
             initial_inputs=initial_inputs, llm_parameters=parameters
         )
