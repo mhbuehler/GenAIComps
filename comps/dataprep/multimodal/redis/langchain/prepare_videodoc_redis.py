@@ -1,6 +1,8 @@
 # Copyright (C) 2024 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
+import base64
+import json
 import os
 import shutil
 import time
@@ -303,7 +305,46 @@ def prepare_data_and_metadata_from_annotation(
     return text_list, image_list, metadatas
 
 
-def ingest_multimodal(videoname, data_folder, embeddings):
+def prepare_pdf_data_from_annotation(
+    annotation, path_to_frames, title):
+    text_list = []
+    image_list = []
+    metadatas = []
+    for i, frame in enumerate(annotation):
+        page_index = frame["frame_no"]
+        image_index = frame["sub_video_id"]
+        path_to_frame = os.path.join(path_to_frames, f"page{page_index}_image{image_index}.png")
+        caption_for_ingesting = frame["caption"]
+        caption_for_inference = frame["caption"]
+
+        video_id = frame["video_id"]
+        b64_img_str = frame["b64_img_str"]
+        time_of_frame = frame["time"]
+        embedding_type = "pair" if b64_img_str else "text"
+        source_video = frame["video_name"]
+
+        text_list.append(caption_for_ingesting)
+
+        if b64_img_str:
+            image_list.append(path_to_frame)
+
+        metadatas.append(
+            {
+                "content": caption_for_ingesting,
+                "b64_img_str": b64_img_str,
+                "video_id": video_id,
+                "source_video": source_video,
+                "time_of_frame_ms": page_index,  # For PDFs save the page number
+                "embedding_type": embedding_type,
+                "title": title,
+                "transcript_for_inference": caption_for_inference,
+            }
+        )
+
+    return text_list, image_list, metadatas
+
+
+def ingest_multimodal(videoname, data_folder, embeddings, is_pdf=False):
     """Ingest text image pairs to Redis from the data/ directory that consists of frames and annotations."""
     data_folder = os.path.abspath(data_folder)
     annotation_file_path = os.path.join(data_folder, "annotations.json")
@@ -312,7 +353,10 @@ def ingest_multimodal(videoname, data_folder, embeddings):
     annotation = load_json_file(annotation_file_path)
 
     # prepare data to ingest
-    text_list, image_list, metadatas = prepare_data_and_metadata_from_annotation(annotation, path_to_frames, videoname)
+    if is_pdf:
+        text_list, image_list, metadatas = prepare_pdf_data_from_annotation(annotation, path_to_frames, videoname)
+    else:
+        text_list, image_list, metadatas = prepare_data_and_metadata_from_annotation(annotation, path_to_frames, videoname)
 
     MultimodalRedis.from_text_image_pairs_return_keys(
         texts=[f"From {videoname}. " + text for text in text_list],
@@ -567,41 +611,49 @@ async def ingest_with_text(files: List[UploadFile] = File(None)):
             uploaded_files_map[file_name] = media_file_name
 
             if file_extension == ".pdf":
-                import cv2
                 # Set up location to store frames and annotations
                 output_dir = os.path.join(upload_folder, media_dir_name)
                 os.makedirs(output_dir, exist_ok=True)
                 os.makedirs(os.path.join(output_dir, "frames"), exist_ok=True)
                 doc = pymupdf.open(os.path.join(upload_folder, media_file_name))
                 annotations = []
-                for page in doc:
+                for page_idx, page in enumerate(doc, start=1):
                     text = page.get_text()
-                    blocks = page.get_text("dict")["blocks"]
-                    imgblocks = [b for b in blocks if b["type"] == 1]
-                    for idx, image in enumerate(imgblocks):
+                    images = page.get_images()
+                    for image_idx, image in enumerate(images, start=1):
                         # Write image and caption file for each image found in pdf
-                        img_fname = f"frame_{idx}"
+                        img_fname = f"page{page_idx}_image{image_idx}"
                         img_fpath = os.path.join(output_dir, "frames", img_fname + ".png")
-                        cv2.imwrite(img_fpath, imgblocks[0]['image'])
+                        pix = pymupdf.Pixmap(doc, image[0])  # create pixmap
+
+                        if pix.n - pix.alpha > 3:  # if CMYK, convert to RGB first
+                            pix = pymupdf.Pixmap(pymupdf.csRGB, pix)
+
+                        pix.save(img_fpath)
+                        pix = None
 
                         # Convert image to base64 encoded string
-                        b64_img_str = convert_img_to_base64(frame)
+                        with open(img_fpath, "rb") as image2str: 
+                            encoded_string = base64.b64encode(image2str.read())
 
                         # Create annotations for frame from transcripts
                         annotations.append(
                             {
                                 "video_id": file_id,
                                 "video_name": os.path.basename(os.path.join(upload_folder, media_file_name)),
-                                "b64_img_str": b64_img_str,
+                                "b64_img_str": encoded_string.decode(),
                                 "caption": text,
                                 "time": 0.0,
-                                "frame_no": 0,
-                                "sub_video_id": idx,
+                                "frame_no": page_idx,
+                                "sub_video_id": image_idx,
                             }
                         )
 
                 with open(os.path.join(output_dir, "annotations.json"), "w") as f:
                     json.dump(annotations, f)
+
+                # Ingest multimodal data into redis
+                ingest_multimodal(file_name, os.path.join(upload_folder, media_dir_name), embeddings, is_pdf=True)
             else:
                 # Save caption file in upload directory
                 caption_file_extension = os.path.splitext(matched_files[media_file][1].filename)[1]
@@ -623,8 +675,8 @@ async def ingest_with_text(files: List[UploadFile] = File(None)):
                 # Ingest multimodal data into redis
                 ingest_multimodal(file_name, os.path.join(upload_folder, media_dir_name), embeddings)
 
-                # Delete temporary media directory containing frames and annotations
-                shutil.rmtree(os.path.join(upload_folder, media_dir_name))
+            # Delete temporary media directory containing frames and annotations
+            shutil.rmtree(os.path.join(upload_folder, media_dir_name))
 
             print(f"Processed file {media_file}")
 
