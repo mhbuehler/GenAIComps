@@ -170,6 +170,8 @@ async def generate(request: Request) -> Response:  # FIXME batch_size=1 for now
         # format the prompt with text only
         prompt = f"{user_label} {prompt}\n{assistant_label}"
 
+    print(repr(prompt))
+
     if args.device == "hpu":
         generate_kwargs = {
             "lazy_mode": True,
@@ -189,7 +191,7 @@ async def generate(request: Request) -> Response:  # FIXME batch_size=1 for now
 
     result = generator([images], prompt=prompt, batch_size=1, generate_kwargs=generate_kwargs)
     end = time.time()
-    result = result[0][0]["generated_text"].split(output_assistant_label)[-1]
+    result = result[0][0]["generated_text"].split(output_assistant_label.strip())[-1].strip()
     print(f"LLaVA result = {result}, time = {(end-start) * 1000 }ms")
     if images:
         for i in images:

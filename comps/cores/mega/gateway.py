@@ -910,13 +910,14 @@ class MultimodalQnAGateway(Gateway):
                     messages_dicts.append(messages_dict)
                 else:
                     raise ValueError(f"Unknown role: {msg_role}")
-
             if system_prompt:
                 prompt = system_prompt + "\n"
-            for messages_dict in messages_dicts:
-                for i, (role, message) in enumerate(messages_dict.items()):
+            for i, messages_dict in enumerate(messages_dicts):
+                for role, message in messages_dict.items():
                     if isinstance(message, tuple):
                         text, image_list = message
+                        # Remove empty items from the image list
+                        image_list = [x for x in image_list if x]
                         # Add image indicators within the conversation
                         image_tags = "<image>\n" * len(image_list)
                         if i == 0:
@@ -973,7 +974,7 @@ class MultimodalQnAGateway(Gateway):
         # Multimodal RAG QnA With Videos has not yet accepts image as input during QnA.
         prompt, images = self._handle_message(chat_request.messages)
         if num_messages > 1:
-            # print(f"This request include image, thus it is a follow-up query. Using lvm megaservice")
+            # print(f"There is more than one message, thus it is a follow-up query. Using lvm megaservice")
             cur_megaservice = self.lvm_megaservice
             initial_inputs = {"prompt": prompt, "image": images}
         else:

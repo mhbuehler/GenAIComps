@@ -48,9 +48,10 @@ function validate_microservice() {
         exit 1
     fi
 
-    # Test sending two images with a text prompt
-    result=$(http_proxy="" curl http://localhost:$lvm_port/v1/lvm -XPOST -d '{"image": ["iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNkYPhfz0AEYBxVSF+FAP5FDvcfRYWgAAAAAElFTkSuQmCC", "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FAAhKDveksOjmAAAAAElFTkSuQmCC"], "prompt":"What are in these images?"}' -H 'Content-Type: application/json')
-    if [[ $result == *"blue"* ]] && [[ $result == *"green"* ]]; then
+    # Test sending two images with a text prompt with one image tag in the prompt.
+    # The first image is green and the second image is blue. Since the default MAX_IMAGES is 1, only the blue image should be sent to the LVM.
+    result=$(http_proxy="" curl http://localhost:$lvm_port/v1/lvm -XPOST -d '{"image": ["iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FAAhKDveksOjmAAAAAElFTkSuQmCC", "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNkYPhfz0AEYBxVSF+FAP5FDvcfRYWgAAAAAElFTkSuQmCC"], "prompt":"<image>\nWhat are in these images?"}' -H 'Content-Type: application/json')
+    if [[ $result == *"blue"* ]]; then
         echo "Result correct."
     else
         echo "Result wrong."
@@ -59,10 +60,22 @@ function validate_microservice() {
         exit 1
     fi
 
-    # Test sending two images with a text prompt where the prompt has only one image tag
-    # (the LVM microservice should add the second one)
-    result=$(http_proxy="" curl http://localhost:$lvm_port/v1/lvm -XPOST -d '{"image": ["iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNkYPhfz0AEYBxVSF+FAP5FDvcfRYWgAAAAAElFTkSuQmCC", "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FAAhKDveksOjmAAAAAElFTkSuQmCC"], "prompt":"<image>\nWhat are in these images?"}' -H 'Content-Type: application/json')
-    if [[ $result == *"blue"* ]] && [[ $result == *"green"* ]]; then
+    # Test sending two images with a text prompt without any image tags.
+    # The first image is blue and the second image is green. Since the default MAX_IMAGES is 1, only the green image should be sent to the LVM.
+    result=$(http_proxy="" curl http://localhost:$lvm_port/v1/lvm -XPOST -d '{"image": ["iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNkYPhfz0AEYBxVSF+FAP5FDvcfRYWgAAAAAElFTkSuQmCC", "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FAAhKDveksOjmAAAAAElFTkSuQmCC"], "prompt":"What are in these images?"}' -H 'Content-Type: application/json')
+    if [[ $result == *"green"* ]]; then
+        echo "Result correct."
+    else
+        echo "Result wrong."
+        docker logs test-comps-lvm-llava >> ${LOG_PATH}/llava-dependency.log
+        docker logs test-comps-lvm-llava-svc >> ${LOG_PATH}/llava-server.log
+        exit 1
+    fi
+
+    # Same test as above, except including two image tags with the prompt to ensure the number of image tags is reconciled.
+    # The first image is blue and the second image is green. Since the default MAX_IMAGES is 1, only the green image should be sent to the LVM.
+    result=$(http_proxy="" curl http://localhost:$lvm_port/v1/lvm -XPOST -d '{"image": ["iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNkYPhfz0AEYBxVSF+FAP5FDvcfRYWgAAAAAElFTkSuQmCC", "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FAAhKDveksOjmAAAAAElFTkSuQmCC"], "prompt":"<image>\n<image>\nWhat are in these images?"}' -H 'Content-Type: application/json')
+    if [[ $result == *"green"* ]]; then
         echo "Result correct."
     else
         echo "Result wrong."
