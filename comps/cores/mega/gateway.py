@@ -990,27 +990,36 @@ class MultimodalQnAGateway(Gateway):
             stream_opt = False
         chat_request = ChatCompletionRequest.model_validate(data)
         # Multimodal RAG QnA With Videos has not yet accepts image as input during QnA.
+        num_messages = len(data["messages"]) if isinstance(data["messages"], list) else 1
+        print("Num messages is: ", num_messages)
         messages = self._handle_message(chat_request.messages)
         decoded_audio_input = ""
-        if isinstance(messages, tuple):
-            prompt, b64_types = messages
-            if "audio" in b64_types:
-                # Audio querys will always come in as a tuple in order to keep track of translation for metadata            
-                decoded_audio_input = b64_types["audio"]
-
-            if "image" in b64_types:
-                # This is an image query, hence it is a follow up query and is using LVM
-                cur_megaservice = self.lvm_megaservice
-                initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
-            else:    
-                # This query includes only text, translated audio, or both, hence it will use Embedding
-                cur_megaservice = self.megaservice
-                initial_inputs = {"text": prompt}
-
+        
+        if num_messages > 1:
+            # This is a follow up query, go to LVM
+            cur_megaservice = self.lvm_megaservice
+            if isinstance(messages, tuple):
+                prompt, b64_types = messages
+                if "audio" in b64_types:
+                    # for metadata storage purposes
+                    decoded_audio_input = b64_types["audio"]
+                if "image" in b64_types:
+                    initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
+                else:
+                    initial_inputs = {"prompt": prompt}
+            else:
+                prompt = messages
+                initial_inputs = {"prompt": prompt}
         else:
-            # This is a query with only text, hence it is a first query and is using Embedding
-            prompt = messages
+            # This is the first query. Ignore image input
             cur_megaservice = self.megaservice
+            if isinstance(messages, tuple):
+                prompt, b64_types = messages
+                if "audio" in b64_types:
+                    # for metadata storage purposes
+                    decoded_audio_input = b64_types["audio"]
+            else:
+                prompt = messages
             initial_inputs = {"text": prompt}
 
         parameters = LLMParams(
