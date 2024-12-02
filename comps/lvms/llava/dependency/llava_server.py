@@ -54,7 +54,6 @@ def pipeline_preprocess(self, image, prompt=None, timeout=None):
             )
 
         model_type = self.model.config.model_type
-        print("Model type: " + model_type)
 
         if model_type == "git":
             if image:
@@ -169,8 +168,6 @@ async def generate(request: Request) -> Response:  # FIXME batch_size=1 for now
         images = None
         # format the prompt with text only
         prompt = f"{user_label} {prompt}\n{assistant_label}"
-
-    print(repr(prompt))
 
     if args.device == "hpu":
         generate_kwargs = {
