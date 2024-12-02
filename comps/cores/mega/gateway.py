@@ -998,6 +998,7 @@ class MultimodalQnAGateway(Gateway):
         if num_messages > 1:
             # This is a follow up query, go to LVM
             cur_megaservice = self.lvm_megaservice
+            print("Using LVM")
             if isinstance(messages, tuple):
                 prompt, b64_types = messages
                 if "audio" in b64_types:
@@ -1006,13 +1007,14 @@ class MultimodalQnAGateway(Gateway):
                 if "image" in b64_types:
                     initial_inputs = {"prompt": prompt, "image": b64_types["image"][0]}
                 else:
-                    initial_inputs = {"prompt": prompt}
+                    initial_inputs = {"prompt": prompt, "image": []}
             else:
                 prompt = messages
-                initial_inputs = {"prompt": prompt}
+                initial_inputs = {"prompt": prompt, "image": []}
         else:
             # This is the first query. Ignore image input
             cur_megaservice = self.megaservice
+            print("Using Embedding")
             if isinstance(messages, tuple):
                 prompt, b64_types = messages
                 if "audio" in b64_types:
