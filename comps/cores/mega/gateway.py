@@ -991,14 +991,12 @@ class MultimodalQnAGateway(Gateway):
         chat_request = ChatCompletionRequest.model_validate(data)
         # Multimodal RAG QnA With Videos has not yet accepts image as input during QnA.
         num_messages = len(data["messages"]) if isinstance(data["messages"], list) else 1
-        print("Num messages is: ", num_messages)
         messages = self._handle_message(chat_request.messages)
         decoded_audio_input = ""
         
         if num_messages > 1:
             # This is a follow up query, go to LVM
             cur_megaservice = self.lvm_megaservice
-            print("Using LVM")
             if isinstance(messages, tuple):
                 prompt, b64_types = messages
                 if "audio" in b64_types:
@@ -1014,7 +1012,6 @@ class MultimodalQnAGateway(Gateway):
         else:
             # This is the first query. Ignore image input
             cur_megaservice = self.megaservice
-            print("Using Embedding")
             if isinstance(messages, tuple):
                 prompt, b64_types = messages
                 if "audio" in b64_types:
