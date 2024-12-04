@@ -850,6 +850,7 @@ class MultimodalQnAGateway(Gateway):
             ChatCompletionRequest,
             ChatCompletionResponse,
         )
+        self._role_labels = _get_role_labels()
 
     def _get_role_labels(self):
         """
@@ -890,7 +891,7 @@ class MultimodalQnAGateway(Gateway):
             messages_dict = {}
             system_prompt = ""
             prompt = ""
-            role_label_dict = self._get_role_labels()
+            role_label_dict = self._role_labels
             for message in messages:
                 msg_role = message["role"]
                 messages_dict = {}
@@ -1038,7 +1039,7 @@ class MultimodalQnAGateway(Gateway):
         num_messages = len(data["messages"]) if isinstance(data["messages"], list) else 1
 
         # Multimodal RAG QnA With Videos has not yet accepts image as input during QnA.
-        prompt, images = self._handle_message(chat_request.messages)
+        messages = self._handle_message(chat_request.messages)
         decoded_audio_input = ""
 
         if num_messages > 1:
