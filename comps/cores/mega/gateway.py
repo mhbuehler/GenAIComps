@@ -9,7 +9,7 @@ from typing import List, Union
 
 import requests
 from fastapi import File, Request, UploadFile
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from PIL import Image
 
 from ..proto.api_protocol import (
@@ -840,6 +840,7 @@ class RetrievalToolGateway(Gateway):
 class MultimodalQnAGateway(Gateway):
     asr_port = int(os.getenv("ASR_SERVICE_PORT", 3001))
     asr_endpoint = os.getenv("ASR_SERVICE_ENDPOINT", "http://0.0.0.0:{}/v1/audio/transcriptions".format(asr_port))
+
     def __init__(self, multimodal_rag_megaservice, lvm_megaservice, host="0.0.0.0", port=9999):
         self.lvm_megaservice = lvm_megaservice
         self._role_labels = self._get_role_labels()
@@ -906,14 +907,12 @@ class MultimodalQnAGateway(Gateway):
                         image_list = [
                             item["image_url"]["url"] for item in message["content"] if item["type"] == "image_url"
                         ]
-                        audios = [
-                            item["audio"] for item in message["content"] if item["type"] == "audio"
-                        ]
+                        audios = [item["audio"] for item in message["content"] if item["type"] == "audio"]
                         if audios:
                             # translate audio to text. From this point forward, audio is treated like text
                             decoded_audio_input = self.convert_audio_to_text(audios)
-                            b64_types["audio"] = decoded_audio_input 
-                         
+                            b64_types["audio"] = decoded_audio_input
+
                         if text and not audios and not image_list:
                             messages_dict[msg_role] = text
                         elif audios and not text and not image_list:
@@ -1005,14 +1004,14 @@ class MultimodalQnAGateway(Gateway):
                                 prompt += role_label_dict[role]
 
         if images:
-            b64_types["image"] = images  
+            b64_types["image"] = images
 
-         # If the query has multiple media types, return all types
+        # If the query has multiple media types, return all types
         if prompt and b64_types:
             return prompt, b64_types
         else:
             return prompt
-        
+
     def convert_audio_to_text(self, audio):
         # translate audio to text by passing in dictionary to ASR
         if isinstance(audio, dict):
@@ -1021,10 +1020,11 @@ class MultimodalQnAGateway(Gateway):
             input_dict = {"byte_str": audio[0]}
 
         response = requests.post(self.asr_endpoint, data=json.dumps(input_dict), proxies={"http": None})
-            
+
         if response.status_code != 200:
-            return JSONResponse(status_code=503, content={"message": "Unable to convert audio to text. {}".format(
-                response.text)})
+            return JSONResponse(
+                status_code=503, content={"message": "Unable to convert audio to text. {}".format(response.text)}
+            )
 
         response = response.json()
         return response["query"]
@@ -1111,7 +1111,7 @@ class MultimodalQnAGateway(Gateway):
             # from retrieval results
             metadata = result_dict[last_node]["metadata"]
             if decoded_audio_input:
-                metadata["audio"] =  decoded_audio_input    
+                metadata["audio"] = decoded_audio_input
         else:
             # follow-up question, no retrieval
             if decoded_audio_input:
