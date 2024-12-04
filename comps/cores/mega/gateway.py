@@ -842,6 +842,7 @@ class MultimodalQnAGateway(Gateway):
     asr_endpoint = os.getenv("ASR_SERVICE_ENDPOINT", "http://0.0.0.0:{}/v1/audio/transcriptions".format(asr_port))
     def __init__(self, multimodal_rag_megaservice, lvm_megaservice, host="0.0.0.0", port=9999):
         self.lvm_megaservice = lvm_megaservice
+        self._role_labels = self._get_role_labels()
         super().__init__(
             multimodal_rag_megaservice,
             host,
@@ -850,7 +851,6 @@ class MultimodalQnAGateway(Gateway):
             ChatCompletionRequest,
             ChatCompletionResponse,
         )
-        self._role_labels = _get_role_labels()
 
     def _get_role_labels(self):
         """
