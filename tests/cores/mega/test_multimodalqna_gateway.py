@@ -267,7 +267,7 @@ class TestServiceOrchestrator(unittest.IsolatedAsyncioTestCase):
                         },
                         {
                             "type": "image_url",
-                            "image_url": {"url": "https://raw.githubusercontent.com/docarray/docarray/refs/heads/main/tests/toydata/image-data/apple.png"},
+                            "image_url": {"url": "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mP8/5+hnoEIwDiqkL4KAcT9GO0U4BxoAAAAAElFTkSuQmCC"},
                         },
                     ],
                 },
@@ -285,9 +285,12 @@ class TestServiceOrchestrator(unittest.IsolatedAsyncioTestCase):
                 },
             ]
             try:
-                prompt, images = test_gateway._handle_message(messages)
+                prompt, b64_types = test_gateway._handle_message(messages)
                 self.assertEqual(prompt, expected_prompt,
                                  "The generated prompt does not match the expected prompt for {} \nActual:\n{}\nExpected:\n{}".format(model_name, repr(prompt), repr(expected_prompt)))
+                self.assertTrue("image" in b64_types.keys())
+                self.assertFalse("audio" in b64_types.keys())
+                self.assertEqual(len(b64_types["image"]), 3)
             finally:
                 test_gateway.stop()
 
