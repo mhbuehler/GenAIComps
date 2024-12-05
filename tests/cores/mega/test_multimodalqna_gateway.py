@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
+import os
 import unittest
 from typing import Union
 
@@ -65,7 +66,23 @@ async def lvm_add(request: Union[LVMDoc, LVMSearchedMultimodalDoc]) -> TextDoc:
     else:
         print("request is from user.")
         text = req_dict["prompt"]
-        text = f"<image>\nUSER: {text}\nASSISTANT:"
+        image_tag = ""
+
+        # There may already be image tags interleaved within the prompt. The LVM service checks that and
+        # adds image tag(s) if they are needed.
+        if "image" in req_dict.keys():
+            num_tags_in_prompt = text.count("<image>\n")
+            if isinstance(req_dict["image"], list):
+                image_list = req_dict["image"]
+            else:
+                image_list = [req_dict["image"]]
+            num_images = len(image_list)
+
+            # Add more image tags, if needed
+            if num_images > num_tags_in_prompt:
+                image_tag = "<image>\n" * (num_images - num_tags_in_prompt)
+
+        text = f"USER: {image_tag}{text}\nASSISTANT:"
 
     res = {}
     res["text"] = text
@@ -111,7 +128,7 @@ class TestServiceOrchestrator(unittest.IsolatedAsyncioTestCase):
             initial_inputs={"prompt": "chao, ", "image": "some image"}
         )
         # print(result_dict)
-        self.assertEqual(result_dict[self.lvm.name]["text"], "<image>\nUSER: chao, \nASSISTANT:")
+        self.assertEqual(result_dict[self.lvm.name]["text"], "USER: <image>\nchao, \nASSISTANT:")
 
     def test_MultimodalQnAGateway_gateway(self):
         json_data = {"messages": "hello, "}
@@ -141,7 +158,7 @@ class TestServiceOrchestrator(unittest.IsolatedAsyncioTestCase):
         response = response.json()
         self.assertEqual(
             response["choices"][-1]["message"]["content"],
-            "<image>\nUSER: hello, \nASSISTANT: opea project! \nUSER: chao, \n\nASSISTANT:",
+            "USER: <image>\nhello, \nASSISTANT: opea project! \nUSER: chao, \n\nASSISTANT:",
         )
 
     def test_handle_message(self):
@@ -160,7 +177,7 @@ class TestServiceOrchestrator(unittest.IsolatedAsyncioTestCase):
             {"role": "user", "content": "chao, "},
         ]
         prompt, images = self.gateway._handle_message(messages)
-        self.assertEqual(prompt, "hello, \nASSISTANT: opea project! \nUSER: chao, \n")
+        self.assertEqual(prompt, "<image>\nhello, \nASSISTANT: opea project! \nUSER: chao, \n")
 
     def test_handle_message_with_system_prompt(self):
         messages = [
@@ -179,7 +196,7 @@ class TestServiceOrchestrator(unittest.IsolatedAsyncioTestCase):
             {"role": "user", "content": "chao, "},
         ]
         prompt, images = self.gateway._handle_message(messages)
-        self.assertEqual(prompt, "System Prompt\nhello, \nASSISTANT: opea project! \nUSER: chao, \n")
+        self.assertEqual(prompt, "System Prompt\n<image>\nhello, \nASSISTANT: opea project! \nUSER: chao, \n")
 
     async def test_handle_request(self):
         json_data = {
@@ -205,8 +222,74 @@ class TestServiceOrchestrator(unittest.IsolatedAsyncioTestCase):
         res = json.loads(res.json())
         self.assertEqual(
             res["choices"][-1]["message"]["content"],
-            "<image>\nUSER: hello, \nASSISTANT: opea project! \nUSER: chao, \n\nASSISTANT:",
+            "USER: <image>\nhello, \nASSISTANT: opea project! \nUSER: chao, \n\nASSISTANT:",
         )
+
+    def test_interleaved_image_handle_message(self):
+        """
+        This tests a back and forth conversation with images interleaved with different models that have different prompt
+        formats than the default LLaVA 1.5 model.
+        """
+
+        # Models to test and their expected prompts
+        model_names = ["llava-hf/llava-interleave-qwen-7b-hf",
+                       "llava-hf/llava-v1.6-mistral-7b-hf",
+                       "llava-hf/llava-v1.6-vicuna-7b-hf"]
+        expected_prompts = ["<image>\nDescribe the image.\n<|im_end|><|im_start|>assistant <image>\nIt is an image of a red apple with a green leaf\n<|im_start|>user <image>\nIs this the same type of fruit?\n",
+                            "<image>\nDescribe the image.\n [/INST] <image>\nIt is an image of a red apple with a green leaf\n[INST] <image>\nIs this the same type of fruit?\n",
+                            "<image>\nDescribe the image.\nASSISTANT: <image>\nIt is an image of a red apple with a green leaf\nUSER: <image>\nIs this the same type of fruit?\n"]
+        gateway_port = 9988
+
+        for model_name, expected_prompt in zip(model_names, expected_prompts):
+            # Simulate running gateway with the specified model
+            lvm_model = os.environ["LVM_MODEL_ID"] = model_name
+            test_gateway = MultimodalQnAGateway(self.service_builder, self.follow_up_query_service_builder, port=gateway_port)
+            gateway_port += 1
+
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text", "text": "Describe the image."
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": "https://raw.githubusercontent.com/docarray/docarray/refs/heads/main/tests/toydata/image-data/apple.png"},
+                        },
+                    ],
+                },
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "text", "text": "It is an image of a red apple with a green leaf"
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": "https://raw.githubusercontent.com/docarray/docarray/refs/heads/main/tests/toydata/image-data/apple.png"},
+                        },
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text", "text": "Is this the same type of fruit?"
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": "http://images.cocodataset.org/test-stuff2017/000000004248.jpg"},
+                        },
+                    ],
+                },
+            ]
+            try:
+                prompt, images = test_gateway._handle_message(messages)
+                self.assertEqual(prompt, expected_prompt,
+                                 "The generated prompt does not match the expected prompt for {} \nActual:\n{}\nExpected:\n{}".format(model_name, repr(prompt), repr(expected_prompt)))
+            finally:
+                test_gateway.stop()
 
 
 if __name__ == "__main__":
