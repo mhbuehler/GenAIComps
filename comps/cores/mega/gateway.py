@@ -947,11 +947,11 @@ class MultimodalQnAGateway(Gateway):
                                 prompt += image_tags + decoded_audio_input + "\n"
                         else:
                             if text:
-                                prompt += role_label_dict[role] + image_tags + " " + text + "\n"
+                                prompt += role_label_dict[role] + " " + image_tags + text + "\n"
                             elif decoded_audio_input:
-                                prompt += role_label_dict[role] + image_tags + " " + decoded_audio_input + "\n"
+                                prompt += role_label_dict[role] + " " + image_tags + decoded_audio_input + "\n"
                             else:
-                                prompt += role_label_dict[role] + image_tags
+                                prompt += role_label_dict[role] + " " + image_tags
                         for img in image_list:
                             # URL
                             if img.startswith("http://") or img.startswith("https://"):

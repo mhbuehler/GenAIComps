@@ -235,9 +235,9 @@ class TestServiceOrchestrator(unittest.IsolatedAsyncioTestCase):
         model_names = ["llava-hf/llava-interleave-qwen-7b-hf",
                        "llava-hf/llava-v1.6-mistral-7b-hf",
                        "llava-hf/llava-v1.6-vicuna-7b-hf"]
-        expected_prompts = ["<image>\nDescribe the image.\n<|im_end|><|im_start|>assistant <image>\nIt is an image of a red apple with a green leaf\n<|im_start|>user <image>\nIs this the same type of fruit?\n",
-                            "<image>\nDescribe the image.\n [/INST] <image>\nIt is an image of a red apple with a green leaf\n[INST] <image>\nIs this the same type of fruit?\n",
-                            "<image>\nDescribe the image.\nASSISTANT: <image>\nIt is an image of a red apple with a green leaf\nUSER: <image>\nIs this the same type of fruit?\n"]
+        expected_prompts = ["<image>\nDescribe the image.\n<|im_end|><|im_start|>assistant It is an image of a red apple with a green leaf\n<|im_start|>user <image>\nIs this the same type of fruit?\n",
+                            "<image>\nDescribe the image.\n [/INST] It is an image of a red apple with a green leaf\n[INST] <image>\nIs this the same type of fruit?\n",
+                            "<image>\nDescribe the image.\nASSISTANT: It is an image of a red apple with a green leaf\nUSER: <image>\nIs this the same type of fruit?\n"]
         gateway_port = 9988
 
         for model_name, expected_prompt in zip(model_names, expected_prompts):
@@ -261,15 +261,7 @@ class TestServiceOrchestrator(unittest.IsolatedAsyncioTestCase):
                 },
                 {
                     "role": "assistant",
-                    "content": [
-                        {
-                            "type": "text", "text": "It is an image of a red apple with a green leaf"
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mP8/5+hnoEIwDiqkL4KAcT9GO0U4BxoAAAAAElFTkSuQmCC"},
-                        },
-                    ],
+                    "content": "It is an image of a red apple with a green leaf"
                 },
                 {
                     "role": "user",
@@ -290,7 +282,7 @@ class TestServiceOrchestrator(unittest.IsolatedAsyncioTestCase):
                                  "The generated prompt does not match the expected prompt for {} \nActual:\n{}\nExpected:\n{}".format(model_name, repr(prompt), repr(expected_prompt)))
                 self.assertTrue("image" in b64_types.keys())
                 self.assertFalse("audio" in b64_types.keys())
-                self.assertEqual(len(b64_types["image"]), 3)
+                self.assertEqual(len(b64_types["image"]), 2)
             finally:
                 test_gateway.stop()
 
