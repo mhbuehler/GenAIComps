@@ -1030,6 +1030,17 @@ class MultimodalQnAGateway(Gateway):
         return response["query"]
 
     async def handle_request(self, request: Request):
+        """
+        MultimodalQnA accepts input queries as text, images, and/or audio. The messages in the request can be a single
+        message (which would be assumed to be a first query from the user) or back and forth conversation between the
+        user and the assistant.
+        Audio queries are converted to text before being sent to the megaservice and the translated text is returned
+        as part of the metadata in the response.
+        First queries are sent to the full Multimodal megaserivce, which includes using the embedding microservice and
+        retriever, in order to get relevant information from the vector store to send to the LVM along with the user's
+        query. Follow up queries are sent directly to the LVM without searching for more similar information from the
+        vector store.
+        """
         data = await request.json()
         stream_opt = bool(data.get("stream", False))
         if stream_opt:
@@ -1037,8 +1048,6 @@ class MultimodalQnAGateway(Gateway):
             stream_opt = False
         chat_request = ChatCompletionRequest.model_validate(data)
         num_messages = len(data["messages"]) if isinstance(data["messages"], list) else 1
-
-        # Multimodal RAG QnA With Videos has not yet accepts image as input during QnA.
         messages = self._handle_message(chat_request.messages)
         decoded_audio_input = ""
 
