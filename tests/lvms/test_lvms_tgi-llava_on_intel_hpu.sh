@@ -24,14 +24,14 @@ function build_docker_images() {
 function start_service() {
     unset http_proxy
     model="llava-hf/llava-v1.6-mistral-7b-hf"
-    lvm_port=5050
+    lvm_port=9399 #5050
     docker run -d --name="test-comps-lvm-tgi-llava" -e http_proxy=$http_proxy -e https_proxy=$https_proxy -p 5027:80 --runtime=habana -e PT_HPU_ENABLE_LAZY_COLLECTIVES=true -e SKIP_TOKENIZER_IN_TGI=true -e HABANA_VISIBLE_DEVICES=all  -e OMPI_MCA_btl_vader_single_copy_mechanism=none --cap-add=sys_nice --ipc=host ghcr.io/huggingface/tgi-gaudi:2.0.5 --model-id $model --max-input-tokens 4096 --max-total-tokens 8192
     docker run -d --name="test-comps-lvm-tgi" -e LVM_ENDPOINT=http://$ip_address:5027 -e http_proxy=$http_proxy -e https_proxy=$https_proxy -p $lvm_port:9399 --ipc=host opea/lvm-tgi:comps
     sleep 3m
 }
 
 function validate_microservice() {
-    lvm_port=5050
+    lvm_port=9399 #5050
     result=$(http_proxy="" curl http://localhost:$lvm_port/v1/lvm -XPOST -d '{"image": "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mP8/5+hnoEIwDiqkL4KAcT9GO0U4BxoAAAAAElFTkSuQmCC", "prompt":"What is this?"}' -H 'Content-Type: application/json')
     if [[ $result == *"yellow"* ]]; then
         echo "LVM prompt with an image - Result correct."
@@ -54,6 +54,41 @@ function validate_microservice() {
         echo "LVM prompt without image - HTTP status (successful)"
     fi
 
+    # Test sending two images with a text prompt with one image tag in the prompt.
+    # The first image is green and the second image is blue. Since the default MAX_IMAGES is 1, only the blue image should be sent to the LVM.
+    result=$(http_proxy="" curl http://localhost:$lvm_port/v1/lvm -XPOST -d '{"image": ["iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FAAhKDveksOjmAAAAAElFTkSuQmCC", "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNkYPhfz0AEYBxVSF+FAP5FDvcfRYWgAAAAAElFTkSuQmCC"], "prompt":"<image>\nWhat are in these images?"}' -H 'Content-Type: application/json')
+    if [[ $result == *"blue"* ]]; then
+        echo "Result correct."
+    else
+        echo "Result wrong."
+        docker logs test-comps-lvm-llava >> ${LOG_PATH}/llava-dependency.log
+        docker logs test-comps-lvm-llava-svc >> ${LOG_PATH}/llava-server.log
+        exit 1
+    fi
+
+    # Test sending two images with a text prompt without any image tags.
+    # The first image is blue and the second image is green. Since the default MAX_IMAGES is 1, only the green image should be sent to the LVM.
+    result=$(http_proxy="" curl http://localhost:$lvm_port/v1/lvm -XPOST -d '{"image": ["iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNkYPhfz0AEYBxVSF+FAP5FDvcfRYWgAAAAAElFTkSuQmCC", "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FAAhKDveksOjmAAAAAElFTkSuQmCC"], "prompt":"What are in these images?"}' -H 'Content-Type: application/json')
+    if [[ $result == *"green"* ]]; then
+        echo "Result correct."
+    else
+        echo "Result wrong."
+        docker logs test-comps-lvm-llava >> ${LOG_PATH}/llava-dependency.log
+        docker logs test-comps-lvm-llava-svc >> ${LOG_PATH}/llava-server.log
+        exit 1
+    fi
+
+    # Same test as above, except including two image tags with the prompt to ensure the number of image tags is reconciled.
+    # The first image is blue and the second image is green. Since the default MAX_IMAGES is 1, only the green image should be sent to the LVM.
+    result=$(http_proxy="" curl http://localhost:$lvm_port/v1/lvm -XPOST -d '{"image": ["iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNkYPhfz0AEYBxVSF+FAP5FDvcfRYWgAAAAAElFTkSuQmCC", "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FAAhKDveksOjmAAAAAElFTkSuQmCC"], "prompt":"<image>\n<image>\nWhat are in these images?"}' -H 'Content-Type: application/json')
+    if [[ $result == *"green"* ]]; then
+        echo "Result correct."
+    else
+        echo "Result wrong."
+        docker logs test-comps-lvm-llava >> ${LOG_PATH}/llava-dependency.log
+        docker logs test-comps-lvm-llava-svc >> ${LOG_PATH}/llava-server.log
+        exit 1
+    fi
 }
 
 function stop_docker() {
@@ -63,15 +98,15 @@ function stop_docker() {
 
 function main() {
 
-    stop_docker
+    #stop_docker
 
-    build_docker_images
-    start_service
+    #build_docker_images
+    #start_service
 
     validate_microservice
 
-    stop_docker
-    echo y | docker system prune
+    #stop_docker
+    #echo y | docker system prune
 
 }
 
