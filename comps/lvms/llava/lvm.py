@@ -27,6 +27,8 @@ from comps import (
 
 logger = CustomLogger("lvm")
 logflag = os.getenv("LOGFLAG", False)
+
+# The maximum number of images that should be sent to the LVM
 max_images = int(os.getenv("MAX_IMAGES", 1))
 
 
