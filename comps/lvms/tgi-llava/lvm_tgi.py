@@ -181,4 +181,6 @@ if __name__ == "__main__":
     lvm_endpoint = os.getenv("LVM_ENDPOINT", "http://localhost:8399")
     lvm_client = AsyncInferenceClient(lvm_endpoint)
     logger.info("[LVM] LVM initialized.")
+    if logflag:
+        logger.info(f"MAX_IMAGES: {max_images}")
     opea_microservices["opea_service@lvm_tgi"].start()
