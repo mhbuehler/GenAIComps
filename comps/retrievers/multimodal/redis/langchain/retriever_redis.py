@@ -72,7 +72,7 @@ async def retrieve(
             # If the input had an image, pass that through in the metadata along with the search result image
             if input.base64_image:
                 if r.metadata["b64_img_str"]:
-                    r.metadata["b64_img_str"] = [r.metadata["b64_img_str"], input.base64_image]
+                    r.metadata["b64_img_str"] = [input.base64_image, r.metadata["b64_img_str"]]
                 else:
                     r.metadata["b64_img_str"] = input.base64_image
             metadata_list.append(r.metadata)
