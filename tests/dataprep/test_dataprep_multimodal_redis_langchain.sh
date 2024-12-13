@@ -20,6 +20,8 @@ audio_fn="${tmp_dir}/${audio_name}.wav"
 image_name="apple"
 image_fn="${tmp_dir}/${image_name}.png"
 caption_fn="${tmp_dir}/${image_name}.txt"
+pdf_name="nke-10k-2023"
+pdf_fn="${tmp_dir}/${pdf_name}.pdf"
 
 function build_docker_images() {
     cd $WORKPATH
@@ -131,6 +133,9 @@ tire.""" > ${transcript_fn}
 
     echo "Downloading Audio"
     wget https://github.com/intel/intel-extension-for-transformers/raw/main/intel_extension_for_transformers/neural_chat/assets/audio/sample.wav -O ${audio_fn}
+
+    echo "Downloading PDF"
+    wget https://raw.githubusercontent.com/opea-project/GenAIComps/main/comps/retrievers/redis/data/nke-10k-2023.pdf -O ${pdf_fn}
 
 }
 
@@ -249,6 +254,30 @@ function validate_microservice() {
         echo "[ $SERVICE_NAME ] HTTP status is 400. Checking content..."
     fi
     if [[ "$RESPONSE_BODY" != *"No caption file found for $image_name"* ]]; then
+        echo "[ $SERVICE_NAME ] Content does not match the expected result: $RESPONSE_BODY"
+        docker logs test-comps-dataprep-multimodal-redis >> ${LOG_PATH}/dataprep_upload_file.log
+        exit 1
+    else
+        echo "[ $SERVICE_NAME ] Content is as expected."
+    fi
+
+    # test v1/ingest_with_text with a PDF file
+    echo "Testing ingest_with_text API with a PDF file"
+    URL="http://${ip_address}:$dataprep_service_port/v1/ingest_with_text"
+
+    HTTP_RESPONSE=$(curl --silent --write-out "HTTPSTATUS:%{http_code}" -X POST -F "files=@$pdf_fn" -H 'Content-Type: multipart/form-data' "$URL")
+    HTTP_STATUS=$(echo $HTTP_RESPONSE | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+    RESPONSE_BODY=$(echo $HTTP_RESPONSE | sed -e 's/HTTPSTATUS\:.*//g')
+    SERVICE_NAME="dataprep - upload - file"
+
+    if [ "$HTTP_STATUS" -ne "200" ]; then
+        echo "[ $SERVICE_NAME ] HTTP status is not 200. Received status was $HTTP_STATUS"
+        docker logs test-comps-dataprep-multimodal-redis >> ${LOG_PATH}/dataprep_upload_file.log
+        exit 1
+    else
+        echo "[ $SERVICE_NAME ] HTTP status is 200. Checking content..."
+    fi
+    if [[ "$RESPONSE_BODY" != *"Data preparation succeeded"* ]]; then
         echo "[ $SERVICE_NAME ] Content does not match the expected result: $RESPONSE_BODY"
         docker logs test-comps-dataprep-multimodal-redis >> ${LOG_PATH}/dataprep_upload_file.log
         exit 1
