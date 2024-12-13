@@ -67,10 +67,10 @@ function validate_microservice() {
 
         if echo "$CONTENT" | grep -q "retrieved_docs"; then
             echo "[ retriever ] Content has retrieved_docs as expected."
-            if echo "$CONTENT" | grep -q "retrieved_docs"; then
-                echo "[ retriever ] Content has img_b64_str as expected."
+            if echo "$CONTENT" | grep -q "b64_img_str"; then
+                echo "[ retriever ] Content has b64_img_str as expected."
             else
-                echo "[ retriever ] Content does not include the img_b64_str: $CONTENT"
+                echo "[ retriever ] Content does not include the b64_img_str: $CONTENT"
                 docker logs test-comps-retriever-multimodal-redis >> ${LOG_PATH}/retriever.log
                 exit 1
             fi
