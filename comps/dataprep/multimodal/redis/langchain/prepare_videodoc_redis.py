@@ -305,12 +305,20 @@ def prepare_data_and_metadata_from_annotation(
     return text_list, image_list, metadatas
 
 
-def prepare_pdf_data_from_annotation(
-    annotation, path_to_frames, title):
+def prepare_pdf_data_from_annotation(annotation, path_to_frames, title):
+    """PDF data processing has some key differences from videos and images.
+    
+    1. Neighboring frames' transcripts are not currently considered relevant.
+       We are only taking the text located on the same page as the image.
+    2. The images/frames are indexed differently, by page and image-within-page
+       indices, as opposed to a single frame index.
+    3. Instead of time of frame in ms, we return the PDF page index through
+       the pre-existing time_of_frame_ms metadata key to maintain compatibility.
+    """
     text_list = []
     image_list = []
     metadatas = []
-    for i, frame in enumerate(annotation):
+    for frame in annotation:
         page_index = frame["frame_no"]
         image_index = frame["sub_video_id"]
         path_to_frame = os.path.join(path_to_frames, f"page{page_index}_image{image_index}.png")
@@ -319,7 +327,6 @@ def prepare_pdf_data_from_annotation(
 
         video_id = frame["video_id"]
         b64_img_str = frame["b64_img_str"]
-        time_of_frame = frame["time"]
         embedding_type = "pair" if b64_img_str else "text"
         source_video = frame["video_name"]
 
@@ -344,7 +351,7 @@ def prepare_pdf_data_from_annotation(
     return text_list, image_list, metadatas
 
 
-def ingest_multimodal(videoname, data_folder, embeddings, is_pdf=False):
+def ingest_multimodal(filename, data_folder, embeddings, is_pdf=False):
     """Ingest text image pairs to Redis from the data/ directory that consists of frames and annotations."""
     data_folder = os.path.abspath(data_folder)
     annotation_file_path = os.path.join(data_folder, "annotations.json")
@@ -354,12 +361,12 @@ def ingest_multimodal(videoname, data_folder, embeddings, is_pdf=False):
 
     # prepare data to ingest
     if is_pdf:
-        text_list, image_list, metadatas = prepare_pdf_data_from_annotation(annotation, path_to_frames, videoname)
+        text_list, image_list, metadatas = prepare_pdf_data_from_annotation(annotation, path_to_frames, filename)
     else:
-        text_list, image_list, metadatas = prepare_data_and_metadata_from_annotation(annotation, path_to_frames, videoname)
+        text_list, image_list, metadatas = prepare_data_and_metadata_from_annotation(annotation, path_to_frames, filename)
 
     MultimodalRedis.from_text_image_pairs_return_keys(
-        texts=[f"From {videoname}. " + text for text in text_list],
+        texts=[f"From {filename}. " + text for text in text_list],
         images=image_list,
         embedding=embeddings,
         metadatas=metadatas,
@@ -611,7 +618,7 @@ async def ingest_with_text(files: List[UploadFile] = File(None)):
             uploaded_files_map[file_name] = media_file_name
 
             if file_extension == ".pdf":
-                # Set up location to store frames and annotations
+                # Set up location to store pdf images and text, reusing "frames" and "annotations" from video
                 output_dir = os.path.join(upload_folder, media_dir_name)
                 os.makedirs(output_dir, exist_ok=True)
                 os.makedirs(os.path.join(output_dir, "frames"), exist_ok=True)
@@ -636,7 +643,7 @@ async def ingest_with_text(files: List[UploadFile] = File(None)):
                         with open(img_fpath, "rb") as image2str: 
                             encoded_string = base64.b64encode(image2str.read())
 
-                        # Create annotations for frame from transcripts
+                        # Create annotations file, reusing metadata keys from video
                         annotations.append(
                             {
                                 "video_id": file_id,
