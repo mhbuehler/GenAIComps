@@ -19,7 +19,6 @@ from langchain_core.embeddings import Embeddings
 from langchain_core.utils import get_from_dict_or_env
 from multimodal_utils import (
     clear_upload_folder,
-    convert_img_to_base64,
     convert_video_to_audio,
     create_upload_folder,
     delete_audio_file,
@@ -636,19 +635,21 @@ async def ingest_with_text(files: List[UploadFile] = File(None)):
                         if pix.n - pix.alpha > 3:  # if CMYK, convert to RGB first
                             pix = pymupdf.Pixmap(pymupdf.csRGB, pix)
 
-                        pix.save(img_fpath)
+                        pix.save(img_fpath)  # pixmap to png
                         pix = None
 
                         # Convert image to base64 encoded string
                         with open(img_fpath, "rb") as image2str: 
-                            encoded_string = base64.b64encode(image2str.read())
+                            encoded_string = base64.b64encode(image2str.read())  # png to bytes
+
+                        decoded_string = encoded_string.decode()  # bytes to string
 
                         # Create annotations file, reusing metadata keys from video
                         annotations.append(
                             {
                                 "video_id": file_id,
                                 "video_name": os.path.basename(os.path.join(upload_folder, media_file_name)),
-                                "b64_img_str": encoded_string.decode(),
+                                "b64_img_str": decoded_string,
                                 "caption": text,
                                 "time": 0.0,
                                 "frame_no": page_idx,

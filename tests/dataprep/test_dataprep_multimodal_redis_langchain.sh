@@ -348,7 +348,7 @@ function validate_microservice() {
     else
         echo "[ $SERVICE_NAME ] HTTP status is 200. Checking content..."
     fi
-    if [[ "$RESPONSE_BODY" != *${image_name}* || "$RESPONSE_BODY" != *${video_name}* || "$RESPONSE_BODY" != *${audio_name}* ]]; then
+    if [[ "$RESPONSE_BODY" != *${image_name}* || "$RESPONSE_BODY" != *${video_name}* || "$RESPONSE_BODY" != *${audio_name}* || "$RESPONSE_BODY" != *${pdf_name}* ]]; then
         echo "[ $SERVICE_NAME ] Content does not match the expected result: $RESPONSE_BODY"
         docker logs test-comps-dataprep-multimodal-redis >> ${LOG_PATH}/dataprep_file.log
         exit 1
