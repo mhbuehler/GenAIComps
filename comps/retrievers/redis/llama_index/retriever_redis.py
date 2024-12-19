@@ -20,7 +20,7 @@ tei_embedding_endpoint = os.getenv("TEI_EMBEDDING_ENDPOINT")
     service_type=ServiceType.RETRIEVER,
     endpoint="/v1/retrieval",
     host="0.0.0.0",
-    port=7000,
+    port=os.getenv("REDIS_RETREIEVER_PORT", 7000),
 )
 async def retrieve(input: EmbedDoc) -> SearchedDoc:
     if logflag:
