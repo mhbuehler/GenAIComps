@@ -28,7 +28,7 @@ from comps import (
     service_type=ServiceType.ASR,
     endpoint="/v1/audio/transcriptions",
     host="0.0.0.0",
-    port=os.getenv("ASR_PORT", 9099),
+    port=int(os.getenv("ASR_PORT", 9099)),
     input_datatype=Base64ByteStrDoc,
     output_datatype=LLMParamsDoc,
 )
