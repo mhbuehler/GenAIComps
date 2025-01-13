@@ -107,18 +107,18 @@ function validate_mm_microservice() {
                     echo "[ retriever ] Content has b64_img_str as expected."
                 else
                     echo "[ retriever ] Content does not include the b64_img_str: $CONTENT"
-                    #docker logs test-comps-retriever-redis-server >> ${LOG_PATH}/retriever.log
+                    docker logs test-comps-retriever-redis-server >> ${LOG_PATH}/retriever.log
                     exit 1
                 fi
             fi
         else
             echo "[ retriever ] Content does not match the expected result: $CONTENT"
-            #docker logs test-comps-retriever-redis-server >> ${LOG_PATH}/retriever.log
+            docker logs test-comps-retriever-redis-server >> ${LOG_PATH}/retriever.log
             exit 1
         fi
     else
         echo "[ retriever ] HTTP status is not 200. Received status was $HTTP_STATUS"
-        #docker logs test-comps-retriever-redis-server >> ${LOG_PATH}/retriever.log
+        docker logs test-comps-retriever-redis-server >> ${LOG_PATH}/retriever.log
         exit 1
     fi
 }
