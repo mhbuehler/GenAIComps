@@ -62,7 +62,7 @@ function validate_microservice() {
 
     retriever_port=5435
     export PATH="${HOME}/miniforge3/bin:$PATH"
-    #source activate
+    source activate
     URL="http://${ip_address}:$retriever_port/v1/retrieval"
 
     HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST -d "{\"text\":\"test\",\"embedding\":${test_embedding}}" -H 'Content-Type: application/json' "$URL")
@@ -89,7 +89,7 @@ function validate_mm_microservice() {
 
     retriever_port=5435
     export PATH="${HOME}/miniforge3/bin:$PATH"
-    #source activate
+    source activate
     URL="http://${ip_address}:$retriever_port/v1/retrieval"
 
     # Test the retriever with a b64 image that should be passed through
@@ -138,13 +138,13 @@ function main() {
 
     # test text retriever
     start_service
-    test_embedding=$(python3 -c "import random; embedding = [random.uniform(-1, 1) for _ in range(768)]; print(embedding)")
+    test_embedding=$(python -c "import random; embedding = [random.uniform(-1, 1) for _ in range(768)]; print(embedding)")
     validate_microservice "$test_embedding"
     stop_docker
 
     # test multimodal retriever
     start_multimodal_service
-    test_embedding_multi=$(python3 -c "import random; embedding = [random.uniform(-1, 1) for _ in range(512)]; print(embedding)")
+    test_embedding_multi=$(python -c "import random; embedding = [random.uniform(-1, 1) for _ in range(512)]; print(embedding)")
     validate_microservice "$test_embedding_multi"
     validate_mm_microservice "$test_embedding_multi"
 
