@@ -123,7 +123,6 @@ function validate_mm_microservice() {
     fi
 }
 
-
 function stop_docker() {
     cid_retrievers=$(docker ps -aq --filter "name=test-comps-retriever-redis*")
     if [[ ! -z "$cid_retrievers" ]]; then
