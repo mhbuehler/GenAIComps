@@ -497,7 +497,7 @@ class OpeaMultimodalRedisDataprep(OpeaComponent):
                 else:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"File {file.filename} is not an mp4, mp3, or wav  file. Please upload mp4, mp3, or wav files only.",
+                        detail=f"File {file.filename} is not an mp4, mp3, or wav file. Please upload mp4, mp3, or wav files only.",
                     )
 
             for file_to_ingest in files_to_ingest:
