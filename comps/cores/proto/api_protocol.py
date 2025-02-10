@@ -335,6 +335,7 @@ class AudioSpeechRequest(BaseModel):
 class ChatMessage(BaseModel):
     role: str
     content: str
+    audio: Optional[Dict[str, Any]] = None
 
 
 class ChatCompletionResponseChoice(BaseModel):
