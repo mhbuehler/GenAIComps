@@ -337,7 +337,6 @@ class ChatMessage(BaseModel):
     content: str
     audio: Optional[Dict[str, Any]] = None
 
-
 class ChatCompletionResponseChoice(BaseModel):
     index: int
     message: ChatMessage
@@ -350,6 +349,7 @@ class ChatCompletionResponse(BaseModel):
     object: str = "chat.completion"
     created: int = Field(default_factory=lambda: int(time.time()))
     model: str
+    modalities: List[Literal["text", "audio"]] = Field(default=["text"])
     choices: List[ChatCompletionResponseChoice]
     usage: UsageInfo
 
