@@ -156,6 +156,7 @@ class ChatCompletionRequest(BaseModel):
         List[Dict[str, Union[str, List[Dict[str, Union[str, Dict[str, str]]]]]]],
     ]
     model: Optional[str] = None
+    modalities: List[Literal["text", "audio"]] = Field(default=["text"])
     frequency_penalty: Optional[float] = 0.0
     logit_bias: Optional[Dict[str, float]] = None
     logprobs: Optional[bool] = False
@@ -349,7 +350,6 @@ class ChatCompletionResponse(BaseModel):
     object: str = "chat.completion"
     created: int = Field(default_factory=lambda: int(time.time()))
     model: str
-    modalities: List[Literal["text", "audio"]] = Field(default=["text"])
     choices: List[ChatCompletionResponseChoice]
     usage: UsageInfo
 
