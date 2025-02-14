@@ -656,6 +656,10 @@ class OpeaMultimodalRedisDataprep(OpeaComponent):
             }
             uploaded_files_map = {}
 
+            # Image captions can be provided as audio files
+            audio_caption_exists = False
+            audio_formats = [".wav", ".mp3"]
+
             # Go through files again and match caption files to media files
             for file in files:
                 file_base, file_extension = os.path.splitext(file.filename)
@@ -664,7 +668,7 @@ class OpeaMultimodalRedisDataprep(OpeaComponent):
                         matched_files["{}.mp4".format(file_base)].append(file)
                     else:
                         logger.info(f"No video was found for caption file {file.filename}.")
-                elif file_extension == ".txt":
+                elif file_extension in [".txt"] + audio_formats:
                     if "{}.png".format(file_base) in matched_files:
                         matched_files["{}.png".format(file_base)].append(file)
                     elif "{}.jpg".format(file_base) in matched_files:
@@ -688,6 +692,13 @@ class OpeaMultimodalRedisDataprep(OpeaComponent):
                     status_code=400,
                     detail="The uploaded files have unsupported formats. Please upload at least one video file (.mp4) with captions (.vtt) or one image (.png, .jpg, .jpeg, or .gif) with caption (.txt) or one .pdf file",
                 )
+
+            # Load whisper model to translate audio caption for images
+            whisper_model = None
+            if audio_caption_exists:
+                logger.info("Loading whisper model....")
+                whisper_model = load_whisper_model(model_name=WHISPER_MODEL)
+                logger.info("Done loading whisper!")
 
             for media_file in matched_files:
                 logger.info(f"Processing file {media_file}")
@@ -759,6 +770,19 @@ class OpeaMultimodalRedisDataprep(OpeaComponent):
                     caption_file = f"{media_dir_name}{caption_file_extension}"
                     with open(os.path.join(self.upload_folder, caption_file), "wb") as f:
                         shutil.copyfileobj(matched_files[media_file][1].file, f)
+
+                    # If caption file is an audio format, get the transcription
+                    if caption_file_extension in audio_formats:
+                        # Get the transcript from the audio and write a vtt file
+                        transcripts = extract_transcript_from_audio(whisper_model, os.path.join(self.upload_folder, caption_file))
+                        vtt_file = f"{media_dir_name}.vtt"
+                        write_vtt(transcripts, os.path.join(self.upload_folder, vtt_file))
+
+                        # Delete the temporary audio
+                        os.remove(os.path.join(self.upload_folder, caption_file))
+
+                        # After this, the caption file is the vtt file
+                        caption_file = vtt_file
 
                     # Store frames and caption annotations in a new directory
                     extract_frames_and_annotations_from_transcripts(
