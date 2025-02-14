@@ -682,6 +682,9 @@ class OpeaMultimodalRedisDataprep(OpeaComponent):
                 elif file_extension not in accepted_media_formats:
                     logger.info(f"Skipping file {file.filename} because of unsupported format.")
 
+                if file_extension in audio_formats:
+                    audio_caption_exists = True
+
             # Check that every media file that is not a pdf has a caption file
             for media_file_name, file_list in matched_files.items():
                 if len(file_list) != 2 and os.path.splitext(media_file_name)[1] != ".pdf":
