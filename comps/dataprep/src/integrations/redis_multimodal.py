@@ -693,7 +693,7 @@ class OpeaMultimodalRedisDataprep(OpeaComponent):
             if len(matched_files.keys()) == 0:
                 return HTTPException(
                     status_code=400,
-                    detail="The uploaded files have unsupported formats. Please upload at least one video file (.mp4) with captions (.vtt) or one image (.png, .jpg, .jpeg, or .gif) with caption (.txt) or one .pdf file",
+                    detail="The uploaded files have unsupported formats. Please upload at least one video file (.mp4) with captions (.vtt) or one image (.png, .jpg, .jpeg, or .gif) with caption (.txt, .mp3, or .wav) or one .pdf file",
                 )
 
             # Load whisper model to translate audio caption for images
@@ -814,7 +814,7 @@ class OpeaMultimodalRedisDataprep(OpeaComponent):
 
         raise HTTPException(
             status_code=400,
-            detail="Must provide at least one pair consisting of video (.mp4) and captions (.vtt) or image (.png, .jpg, .jpeg, .gif) with caption (.txt)",
+            detail="Must provide at least one pair consisting of video (.mp4) and captions (.vtt) or image (.png, .jpg, .jpeg, .gif) with caption (.txt, .mp3, or .wav)",
         )
 
     async def get_files(self):
