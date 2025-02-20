@@ -274,9 +274,6 @@ def extract_frames_and_generate_captions(
             mid_time_ms = mid_time  # Already in ms
 
             frame_no = curr_frame
-            # Reorder the color channels for video but not for images
-            if is_video:
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
             # Save frame for further processing
             img_fname = f"frame_{idx}"
