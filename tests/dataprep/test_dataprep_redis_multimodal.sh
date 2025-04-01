@@ -26,6 +26,9 @@ pdf_fn="${tmp_dir}/${pdf_name}.pdf"
 DATAPREP_PORT="11109"
 export DATA_PATH=${model_cache}
 
+# Used by microservice_request to retry a curl command when the HTTP status code is 000
+MAX_RETRIES=3
+
 function build_docker_images() {
     cd $WORKPATH
     echo $(pwd)
@@ -153,13 +156,38 @@ tire.""" > ${transcript_fn}
 
 }
 
+function microservice_request() {
+    # Execute the specified curl command, check the status code, and retry the command if the status code is 000. The
+    # maximum number of retries is defined in MAX_RETRIES. Echo the HTTP_RESPONSE to pass back the response.
+    local cmd="$1"
+
+    for i in $(seq 1 "$MAX_RETRIES")
+    do
+        HTTP_RESPONSE=$(eval $cmd)
+        HTTP_STATUS=$(echo $HTTP_RESPONSE | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+        echo "HTTP_STATUS: $HTTP_STATUS"
+        if [ "$HTTP_STATUS" == "000" ]; then
+            sleep 3s
+        else
+            break
+        fi
+    done
+
+    if [[ $i -ge $MAX_RETRIES ]]; then
+        echo "WARNING: Max retries reached when executing command: $cmd"
+    fi
+
+    echo $HTTP_RESPONSE
+}
+
 function validate_microservice() {
     cd $LOG_PATH
 
     # test v1/generate_transcripts upload file
     echo "Testing generate_transcripts API"
     URL="http://${ip_address}:$DATAPREP_PORT/v1/dataprep/generate_transcripts"
-    HTTP_RESPONSE=$(curl --silent --write-out "HTTPSTATUS:%{http_code}" -X POST -F "files=@$video_fn" -F "files=@$audio_fn"  -H 'Content-Type: multipart/form-data' "$URL")
+    CMD='curl --silent --write-out "HTTPSTATUS:%{http_code}" -X POST -F "files=@$video_fn" -F "files=@$audio_fn" -H "Content-Type: multipart/form-data" "$URL"'
+    HTTP_RESPONSE=$(microservice_request "$CMD")
     HTTP_STATUS=$(echo $HTTP_RESPONSE | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
     RESPONSE_BODY=$(echo $HTTP_RESPONSE | sed -e 's/HTTPSTATUS\:.*//g')
     SERVICE_NAME="dataprep - upload - file"
